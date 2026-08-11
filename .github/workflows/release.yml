@@ -1,6 +1,7 @@
 name: Release Workflow
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - 'v*'
@@ -33,7 +34,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: v__VERSION__ # The tag name format
+          tagName: v__VERSION__
           releaseName: 'Hammer Pro Journal v__VERSION__'
           releaseBody: 'Automated release of Hammer Pro Journal v__VERSION__'
           releaseDraft: false
