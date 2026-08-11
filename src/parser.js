@@ -18,37 +18,64 @@ export function isDarkpool(route) {
     return !LIT_ECNS.has(r);
 }
 
-export function parseTime(timeStr) {
-    const m = timeStr.trim().match(/^(\d{2})\/(\d{2})\/(\d{2,4})\s+(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)?$/i);
-    if (!m) {
-        const m2 = timeStr.trim().match(/^(\d{2})\/(\d{2})\/(\d{2,4})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
-        if (!m2) {
-            throw new Error("Could not parse time: " + timeStr);
+export function parseTime(timeStr, defaultDateStr = null) {
+    if (!timeStr) {
+        return defaultDateStr ? new Date(defaultDateStr) : new Date();
+    }
+    const str = timeStr.trim();
+
+    // Default fallback date components
+    const fallback = defaultDateStr ? new Date(defaultDateStr) : new Date();
+    let year = fallback.getFullYear();
+    let month = fallback.getMonth() + 1; // 1-based
+    let day = fallback.getDate();
+    let timePart = str;
+
+    // Check if timestamp contains a date: MM/DD/YY, MM-DD-YY, YYYY-MM-DD, etc.
+    const dateMatch = str.match(/^(\d{1,4})[/.\-](\d{1,2})[/.\-](\d{1,4})\s+(.*)$/);
+    if (dateMatch) {
+        let p1 = parseInt(dateMatch[1], 10);
+        let p2 = parseInt(dateMatch[2], 10);
+        let p3 = parseInt(dateMatch[3], 10);
+        timePart = dateMatch[4];
+
+        if (p1 > 1000) {
+            // YYYY-MM-DD
+            year = p1;
+            month = p2;
+            day = p3;
+        } else {
+            // MM-DD-YY or DD-MM-YY or MM/DD/YYYY
+            year = p3 < 100 ? 2000 + p3 : p3;
+            // Standard US format MM/DD/YY: month=p1, day=p2
+            if (p1 > 12) {
+                // DD/MM/YY
+                month = p2;
+                day = p1;
+            } else {
+                month = p1;
+                day = p2;
+            }
         }
-        let [_, month, day, year, hour, minute, second] = m2;
-        month = parseInt(month, 10);
-        day = parseInt(day, 10);
-        year = parseInt(year, 10);
-        if (year < 100) year += 2000;
-        hour = parseInt(hour, 10);
-        minute = parseInt(minute, 10);
-        second = parseInt(second, 10);
-        return new Date(year, month - 1, day, hour, minute, second);
     }
-    let [_, month, day, year, hour, minute, second, ampm] = m;
-    month = parseInt(month, 10);
-    day = parseInt(day, 10);
-    year = parseInt(year, 10);
-    if (year < 100) year += 2000;
-    hour = parseInt(hour, 10);
-    minute = parseInt(minute, 10);
-    second = parseInt(second, 10);
-    
+
+    // Parse time part: HH:MM:SS or HH:MM:SS AM/PM or HH:MM
+    const timeMatch = timePart.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+    if (!timeMatch) {
+        return new Date(year, month - 1, day, 12, 0, 0);
+    }
+
+    let [_, hourStr, minStr, secStr, ampm] = timeMatch;
+    let hour = parseInt(hourStr, 10);
+    let minute = parseInt(minStr, 10);
+    let second = secStr ? parseInt(secStr, 10) : 0;
+
     if (ampm) {
-        if (ampm.toUpperCase() === 'PM' && hour < 12) hour += 12;
-        if (ampm.toUpperCase() === 'AM' && hour === 12) hour = 0;
+        const u = ampm.toUpperCase();
+        if (u === 'PM' && hour < 12) hour += 12;
+        if (u === 'AM' && hour === 12) hour = 0;
     }
-    
+
     return new Date(year, month - 1, day, hour, minute, second);
 }
 
@@ -61,45 +88,75 @@ export function formatTimeLabel(dateObj) {
     return `${formattedHour}:${mins}:${secs} ${ampm}`;
 }
 
-export function parseLogLine(line) {
-    const parts = line.split('\t');
-    if (parts.length < 4) return null;
-    const [timestamp, symbol, status, desc] = parts;
-    
-    const descParts = desc.split(' : ');
-    const execDesc = descParts[0];
-    const orderDesc = descParts.length > 1 ? descParts[1] : "";
-    
-    const mExec = execDesc.match(/^(Sold|Bought)\s+(\S+)\s+(\d+)\s+@\s+([\d\.]+)/);
+export function parseLogLine(line, defaultDateStr = null) {
+    const cleanLine = line.trim();
+    if (!cleanLine) return null;
+
+    // Split line by tabs, unicode space characters (\u2004, \u2003, \u00A0), pipe, or 2+ spaces
+    const parts = cleanLine.split(/\t|\u2004+|\u2003+|\u00A0+|\||\s{2,}/);
+
+    let timestamp = "";
+    let symbol = "";
+    let status = "Executed";
+    let desc = "";
+
+    if (parts.length >= 4) {
+        timestamp = parts[0];
+        symbol = parts[1];
+        status = parts[2];
+        desc = parts.slice(3).join(" ");
+    } else if (parts.length >= 2) {
+        timestamp = parts[0];
+        desc = parts.slice(1).join(" ");
+    } else {
+        desc = cleanLine;
+    }
+
+    // Match Execution pattern: "Sold AAPL 100 @ 150.25" or "Bought NVDA 10 @ 120.5"
+    const mExec = desc.match(/(Sold|Bought)\s+(\S+)\s+(\d+)\s+@\s+([\d\.]+)/i);
     if (!mExec) return null;
-    
-    const [_, action, execSymbol, qtyStr, priceStr] = mExec;
-    const execQty = parseInt(qtyStr, 10);
-    const execPrice = parseFloat(priceStr);
-    
+
+    const action = mExec[1].charAt(0).toUpperCase() + mExec[1].slice(1).toLowerCase(); // Normalized "Bought" or "Sold"
+    const execSymbol = symbol || mExec[2];
+    const execQty = parseInt(mExec[3], 10);
+    const execPrice = parseFloat(mExec[4]);
+
     // Extract ECN Route (e.g. "Route to NSDQ Hidden", "Route to SIGMAX Hidden")
     const mRoute = desc.match(/Route\s+to\s+([A-Z0-9]+)/i);
     let route = mRoute ? mRoute[1].toUpperCase() : 'DIRECT';
-    
+
     // Route Aliasing Normalization
     if (route === 'STOP') route = 'BATS';
     if (route === 'NQBX') route = 'BOSX';
-    
-    const mOrder = orderDesc.match(/^(SHORT|BUY|SELL)\s+(\d+)\s+(\S+)/);
+
+    // Extract order description details
+    const descParts = desc.split(' : ');
+    const orderDesc = descParts.length > 1 ? descParts[1] : "";
+
+    const mOrder = orderDesc.match(/(SHORT|BUY|SELL)\s+(\d+)\s+(\S+)/i);
     let orderSide, orderQty;
     if (mOrder) {
-        const [__, sideStr, orderQtyStr, orderSymbol] = mOrder;
-        orderSide = sideStr;
-        orderQty = parseInt(orderQtyStr, 10);
+        orderSide = mOrder[1].toUpperCase();
+        orderQty = parseInt(mOrder[2], 10);
     } else {
         orderSide = action === 'Bought' ? 'BUY' : 'SELL';
         orderQty = execQty;
     }
-    
+
+    // Standardize timestamp date format if missing
+    let parsedDateObj = parseTime(timestamp, defaultDateStr);
+    const mDate = timestamp.match(/^(\d{1,4})[/.\-](\d{1,2})[/.\-](\d{1,4})/);
+    let formattedTimestamp = timestamp;
+    if (!mDate && defaultDateStr) {
+        // Timestamp only had time (e.g. 13:19:19), attach default date
+        formattedTimestamp = `${defaultDateStr} ${timestamp}`;
+    }
+
     return {
-        timestamp,
-        symbol,
-        status,
+        timestamp: formattedTimestamp,
+        dateObj: parsedDateObj,
+        symbol: execSymbol,
+        status: status || 'Filled',
         action,
         execQty,
         execPrice,
@@ -110,21 +167,19 @@ export function parseLogLine(line) {
     };
 }
 
-export function extractExecutions(rawText) {
+export function extractExecutions(rawText, defaultDateStr = null) {
     if (!rawText) return [];
     const lines = rawText.split('\n');
     const executions = [];
     for (let line of lines) {
         if (!line.trim()) continue;
-        if (/^\d{2}\/\d{2}\/\d{2}/.test(line.trim())) {
-            try {
-                const parsed = parseLogLine(line.trim());
-                if (parsed) {
-                    executions.push(parsed);
-                }
-            } catch (e) {
-                console.error("Error parsing line: " + line, e);
+        try {
+            const parsed = parseLogLine(line.trim(), defaultDateStr);
+            if (parsed) {
+                executions.push(parsed);
             }
+        } catch (e) {
+            console.error("Error parsing line: " + line, e);
         }
     }
     return executions;
@@ -133,16 +188,18 @@ export function extractExecutions(rawText) {
 export function matchTradesFIFO(executions) {
     const openPositions = {};
     const completedTrades = [];
-    
+
     const sortedExecs = [...executions].sort((a, b) => {
-        return parseTime(a.timestamp) - parseTime(b.timestamp);
+        const timeA = a.dateObj ? a.dateObj : parseTime(a.timestamp);
+        const timeB = b.dateObj ? b.dateObj : parseTime(b.timestamp);
+        return timeA - timeB;
     });
 
     for (let exec of sortedExecs) {
         const symbol = exec.symbol;
         const execSide = exec.action === 'Bought' ? 'B' : 'S';
-        const execTime = parseTime(exec.timestamp);
-        
+        const execTime = exec.dateObj ? exec.dateObj : parseTime(exec.timestamp);
+
         if (!openPositions[symbol] || openPositions[symbol].side === null) {
             const pos = new Position(symbol, execSide);
             pos.inventory.push({
@@ -163,22 +220,22 @@ export function matchTradesFIFO(executions) {
                 });
             } else {
                 let remainingQty = exec.execQty;
-                
+
                 while (remainingQty > 0 && pos.inventory.length > 0) {
                     const first = pos.inventory[0];
                     const matchQty = Math.min(remainingQty, first.qty);
-                    
+
                     let tradePnl = 0;
                     if (pos.side === 'B') {
                         tradePnl = (exec.execPrice - first.price) * matchQty;
                     } else {
                         tradePnl = (first.price - exec.execPrice) * matchQty;
                     }
-                    
+
                     const entryTime = first.time;
                     const exitTime = execTime;
                     const holdingSeconds = Math.max(0, (exitTime - entryTime) / 1000);
-                    
+
                     completedTrades.push({
                         symbol: symbol,
                         side: pos.side,
@@ -192,15 +249,15 @@ export function matchTradesFIFO(executions) {
                         entryRoute: first.route,
                         exitRoute: exec.route
                     });
-                    
+
                     first.qty -= matchQty;
                     remainingQty -= matchQty;
-                    
+
                     if (first.qty === 0) {
                         pos.inventory.shift();
                     }
                 }
-                
+
                 if (remainingQty > 0) {
                     pos.side = execSide;
                     pos.inventory.push({
@@ -215,34 +272,149 @@ export function matchTradesFIFO(executions) {
             }
         }
     }
-    
+
     return completedTrades;
+}
+
+export function matchTradesFIFOWithOpenPos(executions) {
+    const openPositions = {};
+    const completedTrades = [];
+
+    const sortedExecs = [...executions].sort((a, b) => {
+        const timeA = a.dateObj ? a.dateObj : parseTime(a.timestamp);
+        const timeB = b.dateObj ? b.dateObj : parseTime(b.timestamp);
+        return timeA - timeB;
+    });
+
+    for (let exec of sortedExecs) {
+        const symbol = exec.symbol;
+        const execSide = exec.action === 'Bought' ? 'B' : 'S';
+        const execTime = exec.dateObj ? exec.dateObj : parseTime(exec.timestamp);
+
+        if (!openPositions[symbol] || openPositions[symbol].side === null) {
+            const pos = new Position(symbol, execSide);
+            pos.inventory.push({
+                time: execTime,
+                price: exec.execPrice,
+                qty: exec.execQty,
+                route: exec.route
+            });
+            openPositions[symbol] = pos;
+        } else {
+            const pos = openPositions[symbol];
+            if (pos.side === execSide) {
+                pos.inventory.push({
+                    time: execTime,
+                    price: exec.execPrice,
+                    qty: exec.execQty,
+                    route: exec.route
+                });
+            } else {
+                let remainingQty = exec.execQty;
+
+                while (remainingQty > 0 && pos.inventory.length > 0) {
+                    const first = pos.inventory[0];
+                    const matchQty = Math.min(remainingQty, first.qty);
+
+                    let tradePnl = 0;
+                    if (pos.side === 'B') {
+                        tradePnl = (exec.execPrice - first.price) * matchQty;
+                    } else {
+                        tradePnl = (first.price - exec.execPrice) * matchQty;
+                    }
+
+                    const entryTime = first.time;
+                    const exitTime = execTime;
+                    const holdingSeconds = Math.max(0, (exitTime - entryTime) / 1000);
+
+                    completedTrades.push({
+                        symbol: symbol,
+                        side: pos.side,
+                        qty: matchQty,
+                        entryPrice: first.price,
+                        exitPrice: exec.execPrice,
+                        entryTime: entryTime,
+                        exitTime: exitTime,
+                        pnl: tradePnl,
+                        holdingSeconds: holdingSeconds,
+                        entryRoute: first.route,
+                        exitRoute: exec.route
+                    });
+
+                    first.qty -= matchQty;
+                    remainingQty -= matchQty;
+
+                    if (first.qty === 0) {
+                        pos.inventory.shift();
+                    }
+                }
+
+                if (remainingQty > 0) {
+                    pos.side = execSide;
+                    pos.inventory.push({
+                        time: execTime,
+                        price: exec.execPrice,
+                        qty: remainingQty,
+                        route: exec.route
+                    });
+                } else if (pos.inventory.length === 0) {
+                    pos.side = null;
+                }
+            }
+        }
+    }
+
+    const openPositionsSummary = [];
+    Object.keys(openPositions).forEach(sym => {
+        const pos = openPositions[sym];
+        if (pos && pos.side !== null && pos.inventory.length > 0) {
+            const totalQty = pos.inventory.reduce((acc, inv) => acc + inv.qty, 0);
+            const totalCost = pos.inventory.reduce((acc, inv) => acc + inv.qty * inv.price, 0);
+            const avgEntryPrice = totalQty > 0 ? totalCost / totalQty : 0;
+            openPositionsSummary.push({
+                symbol: sym,
+                side: pos.side,
+                qty: totalQty,
+                avgPrice: avgEntryPrice
+            });
+        }
+    });
+
+    return { completedTrades, openPositionsSummary };
 }
 
 // Compile Single-Day Deep-Dive Analytics
 export function compileSingleDayAnalytics(executions) {
     if (!executions || executions.length === 0) return null;
 
-    const sortedExecs = [...executions].sort((a, b) => parseTime(a.timestamp) - parseTime(b.timestamp));
-    const trades = matchTradesFIFO(sortedExecs);
+    const sortedExecs = [...executions].sort((a, b) => {
+        const timeA = a.dateObj ? a.dateObj : parseTime(a.timestamp);
+        const timeB = b.dateObj ? b.dateObj : parseTime(b.timestamp);
+        return timeA - timeB;
+    });
+
+    const { completedTrades: trades, openPositionsSummary } = matchTradesFIFOWithOpenPos(sortedExecs);
 
     let totalBoughtQty = 0;
     let totalSoldQty = 0;
-    let totalPnl = 0;
+    let totalPnl = trades.reduce((acc, t) => acc + t.pnl, 0);
 
     sortedExecs.forEach(exec => {
         if (exec.action === 'Bought') {
             totalBoughtQty += exec.execQty;
-            totalPnl -= exec.execQty * exec.execPrice;
         } else {
             totalSoldQty += exec.execQty;
-            totalPnl += exec.execQty * exec.execPrice;
         }
     });
 
     // Long vs Short stats
     const longStats = { count: 0, pnl: 0, volume: 0 };
     const shortStats = { count: 0, pnl: 0, volume: 0 };
+
+    let winPnlTotal = 0;
+    let winTradesCount = 0;
+    let lossPnlTotal = 0;
+    let lossTradesCount = 0;
 
     trades.forEach(t => {
         if (t.side === 'B') {
@@ -254,7 +426,19 @@ export function compileSingleDayAnalytics(executions) {
             shortStats.pnl += t.pnl;
             shortStats.volume += t.qty;
         }
+
+        if (t.pnl > 0) {
+            winPnlTotal += t.pnl;
+            winTradesCount++;
+        } else if (t.pnl < 0) {
+            lossPnlTotal += Math.abs(t.pnl);
+            lossTradesCount++;
+        }
     });
+
+    const avgWin = winTradesCount > 0 ? winPnlTotal / winTradesCount : 0;
+    const avgLoss = lossTradesCount > 0 ? lossPnlTotal / lossTradesCount : 0;
+    const winLossRatio = avgLoss > 0 ? avgWin / avgLoss : avgWin;
 
     // Per-Stock Summary with Darkpool vs Lit tracking for the single day
     const stockMap = {};
@@ -283,7 +467,7 @@ export function compileSingleDayAnalytics(executions) {
         const stockTrades = trades.filter(t => t.symbol === stock.symbol);
         const totalHold = stockTrades.reduce((acc, t) => acc + t.holdingSeconds, 0);
         const avgHoldTime = stockTrades.length > 0 ? totalHold / stockTrades.length : 0;
-        
+
         // Track entry/exit Darkpool venues
         const entryDarkpools = new Set();
         const exitDarkpools = new Set();
@@ -376,6 +560,12 @@ export function compileSingleDayAnalytics(executions) {
         totalOrders: trades.length,
         longStats,
         shortStats,
+        avgWin,
+        avgLoss,
+        winLossRatio,
+        winningTrades: winTradesCount,
+        losingTrades: lossTradesCount,
+        openPositionsSummary,
         stockBreakdown,
         intradayEquityCurve,
         ecnBreakdown,
@@ -511,7 +701,7 @@ export function compileOverallAnalytics(trades, dailyStatsMap) {
             equityCurve: []
         };
     }
-    
+
     let totalPnl = 0;
     let winningTrades = 0;
     let losingTrades = 0;
@@ -519,14 +709,14 @@ export function compileOverallAnalytics(trades, dailyStatsMap) {
     let grossLosses = 0;
     let totalHoldTime = 0;
     let totalShares = 0;
-    
+
     const tickerMap = {};
-    
+
     trades.forEach(trade => {
         totalPnl += trade.pnl;
         totalHoldTime += trade.holdingSeconds;
         totalShares += trade.qty;
-        
+
         if (trade.pnl > 0) {
             winningTrades++;
             grossProfits += trade.pnl;
@@ -534,7 +724,7 @@ export function compileOverallAnalytics(trades, dailyStatsMap) {
             losingTrades++;
             grossLosses += Math.abs(trade.pnl);
         }
-        
+
         const sym = trade.symbol;
         if (!tickerMap[sym]) {
             tickerMap[sym] = {
@@ -555,11 +745,11 @@ export function compileOverallAnalytics(trades, dailyStatsMap) {
             stat.winningTrades++;
         }
     });
-    
+
     const winRate = trades.length > 0 ? (winningTrades / trades.length) * 100 : 0;
     const profitFactor = grossLosses > 0 ? grossProfits / grossLosses : grossProfits;
     const avgHoldTime = trades.length > 0 ? totalHoldTime / trades.length : 0;
-    
+
     const tickerStats = Object.values(tickerMap).map(stat => {
         return {
             symbol: stat.symbol,
@@ -570,7 +760,7 @@ export function compileOverallAnalytics(trades, dailyStatsMap) {
             avgHoldTime: stat.totalHoldSeconds / stat.tradesCount
         };
     }).sort((a, b) => b.pnl - a.pnl);
-    
+
     const dates = Object.keys(dailyStatsMap).sort((a, b) => new Date(a) - new Date(b));
     let runningPnl = 0;
     const equityCurve = dates.map(date => {
@@ -581,7 +771,7 @@ export function compileOverallAnalytics(trades, dailyStatsMap) {
             cumulativePnl: runningPnl
         };
     });
-    
+
     return {
         totalPnl,
         winRate,

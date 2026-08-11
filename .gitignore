@@ -23,3 +23,6 @@ yarn-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+logs-res
+tauri-update-key.txt

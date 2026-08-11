@@ -51,12 +51,14 @@ body {
   border-right: 1px solid var(--border-light);
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
   padding: 1.5rem;
   position: fixed;
   height: 100vh;
   left: 0;
   top: 0;
   z-index: 10;
+  overflow-y: auto;
 }
 
 .sidebar-logo {
@@ -64,14 +66,35 @@ body {
   align-items: center;
   gap: 0.75rem;
   font-weight: 800;
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   color: var(--hero-green);
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
   padding-left: 0.25rem;
+}
+
+.sidebar-logo-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-logo-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--hero-green);
+  letter-spacing: -0.01em;
+}
+
+.sidebar-logo-author {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-top: 2px;
 }
 
 .sidebar-logo svg {
   color: var(--hero-green);
+  flex-shrink: 0;
 }
 
 .nav-section-title {
@@ -80,21 +103,21 @@ body {
   color: var(--text-light);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  margin: 1.25rem 0 0.5rem 0.5rem;
+  margin: 1rem 0 0.4rem 0.5rem;
 }
 
 .nav-links {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  flex-grow: 1;
+  flex-grow: 0;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem 1rem;
+  padding: 0.7rem 1rem;
   border-radius: 0.75rem;
   color: var(--text-muted);
   text-decoration: none;
@@ -115,14 +138,91 @@ body {
   box-shadow: 0 4px 12px rgba(6, 78, 59, 0.15);
 }
 
-.sidebar-footer-credit {
-  border-top: 1px solid var(--border-light);
-  padding-top: 1rem;
-  font-size: 0.75rem;
-  color: var(--text-light);
+/* Toast Notification Styles */
+.toast-container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.toast-item {
+  pointer-events: auto;
+  min-width: 280px;
+  max-width: 420px;
+  padding: 0.85rem 1.25rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.88rem;
   font-weight: 600;
+  color: #ffffff;
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s ease;
+}
+
+.toast-success {
+  background-color: #047857;
+  border-left: 4px solid #34d399;
+}
+
+.toast-error {
+  background-color: #be123C;
+  border-left: 4px solid #fb7185;
+}
+
+.toast-info {
+  background-color: #1d4ed8;
+  border-left: 4px solid #60a5fa;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* OCR Upload Box */
+.ocr-drop-box {
+  border: 2px dashed #d1d5db;
+  border-radius: 0.85rem;
+  padding: 1.25rem;
   text-align: center;
-  margin-top: auto;
+  background-color: #f9fafb;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 1rem;
+}
+
+.ocr-drop-box:hover {
+  border-color: var(--hero-green);
+  background-color: #ecfdf5;
+}
+
+.ocr-progress-bar-bg {
+  width: 100%;
+  height: 6px;
+  background-color: #e5e7eb;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+
+.ocr-progress-bar-fill {
+  height: 100%;
+  background-color: var(--hero-green);
+  transition: width 0.2s ease;
 }
 
 /* Main Layout Content */
@@ -545,8 +645,8 @@ tr.clickable-row:hover td {
   background-color: #f9fafb;
 }
 
-/* Badges */
-.badge {
+/* Badges & Pills */
+.badge, .pill {
   display: inline-block;
   padding: 0.2rem 0.6rem;
   font-size: 0.75rem;
@@ -565,16 +665,20 @@ tr.clickable-row:hover td {
   color: var(--rose-text);
 }
 
-.badge-route {
-  background-color: var(--blue-bg);
-  color: var(--blue-text);
+.badge-route, .pill-blue {
+  background-color: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
   font-family: monospace;
+  font-weight: 600;
 }
 
-.badge-darkpool {
-  background-color: var(--purple-bg);
-  color: var(--purple-text);
+.badge-darkpool, .pill-purple {
+  background-color: #f3e8ff;
+  color: #6b21a8;
+  border: 1px solid #d8b4fe;
   font-family: monospace;
+  font-weight: 700;
 }
 
 /* Screenshot Dropzone & Grid */
