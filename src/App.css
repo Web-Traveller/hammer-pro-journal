@@ -880,3 +880,445 @@ textarea:focus {
 .copy-btn:hover {
   background: rgba(255, 255, 255, 0.2);
 }
+
+/* Settings Form Controls */
+.settings-section {
+  background-color: var(--panel-bg);
+  border: 1px solid var(--border-light);
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+}
+
+.settings-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text-main);
+  margin-bottom: 0.25rem;
+}
+
+.settings-desc {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 1.25rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.form-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.form-select, .form-input {
+  padding: 0.65rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-light);
+  background-color: #f9fafb;
+  font-size: 0.9rem;
+  color: var(--text-main);
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.form-select:focus, .form-input:focus {
+  border-color: var(--hero-green);
+  background-color: #ffffff;
+}
+
+.toggle-switch {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-slider {
+  width: 44px;
+  height: 24px;
+  background-color: #e5e7eb;
+  border-radius: 12px;
+  position: relative;
+  transition: background-color 0.2s ease;
+}
+
+.toggle-slider::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease;
+}
+
+.toggle-checkbox:checked + .toggle-slider {
+  background-color: var(--hero-green);
+}
+
+.toggle-checkbox:checked + .toggle-slider::after {
+  transform: translateX(20px);
+}
+
+/* Expandable Fills Drawer in Stock Breakdown */
+.fill-drawer-row td {
+  background-color: #f9fafb;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.nested-fills-table {
+  width: 100%;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+  background-color: #ffffff;
+}
+
+.nested-fills-table th {
+  background-color: #f3f4f6;
+  font-size: 0.72rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.nested-fills-table td {
+  font-size: 0.8rem;
+  padding: 0.5rem 0.75rem;
+  background-color: #ffffff;
+}
+
+/* Session Journal Tab Cards */
+.journal-highlight-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.journal-card {
+  background-color: #ffffff;
+  border: 1px solid var(--border-light);
+  border-radius: 1rem;
+  padding: 1.25rem;
+}
+
+.journal-card-best {
+  border-left: 4px solid var(--emerald);
+  background-color: #f0fdf4;
+}
+
+.journal-card-worst {
+  border-left: 4px solid var(--rose-accent);
+  background-color: #fff1f2;
+}
+
+/* Stock Market Detail Hero Bar */
+.stock-market-hero {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 1rem;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: #ffffff;
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.15);
+}
+
+@media (max-width: 1024px) {
+  .stock-market-hero {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.stock-hero-metric {
+  display: flex;
+  flex-direction: column;
+}
+
+.stock-hero-label {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+}
+
+.stock-hero-value {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.stock-hero-sub {
+  font-size: 0.75rem;
+  color: #cbd5e1;
+  margin-top: 0.15rem;
+}
+
+/* Mode Switcher Toggle Bar (Simple vs Advanced) */
+.mode-toggle-bar {
+  display: flex;
+  background-color: #e2e8f0;
+  border-radius: 9999px;
+  padding: 3px;
+  gap: 3px;
+}
+
+.mode-toggle-btn {
+  padding: 0.45rem 1.1rem;
+  border-radius: 9999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mode-toggle-btn.active {
+  background-color: #ffffff;
+  color: var(--text-main);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* Finviz Stock Terminal Header - Hero Emerald Design */
+.stock-terminal-header {
+  background-color: var(--hero-green);
+  color: #ffffff;
+  border-radius: 1.25rem;
+  padding: 1.75rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 10px 25px rgba(6, 78, 59, 0.18);
+}
+
+.stock-terminal-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.stock-terminal-symbol {
+  font-size: 2.2rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  line-height: 1;
+}
+
+.stock-terminal-name {
+  font-size: 1.1rem;
+  color: #a7f3d0;
+  font-weight: 700;
+  margin-top: 0.35rem;
+}
+
+.stock-terminal-price-box {
+  text-align: right;
+}
+
+.stock-terminal-price {
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: #ffffff;
+  line-height: 1;
+}
+
+.stock-terminal-change {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-top: 0.25rem;
+}
+
+.change-green {
+  color: #6ee7b7;
+}
+
+.change-red {
+  color: #fca5a5;
+}
+
+/* Finviz Metrics Table Grid - Clean White & Emerald Cards */
+.finviz-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.85rem;
+  margin-top: 1.25rem;
+}
+
+@media (max-width: 1200px) {
+  .finviz-metrics-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+@media (max-width: 768px) {
+  .finviz-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.finviz-metric-card {
+  background-color: #ffffff;
+  border: 1px solid var(--border-light);
+  border-radius: 0.85rem;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  transition: transform 0.15s ease;
+}
+
+.finviz-metric-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--hero-green);
+}
+
+.finviz-metric-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.finviz-metric-value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+/* Ticker Pill List for Stock Selection */
+.ticker-pill-bar {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.ticker-pill {
+  padding: 0.45rem 1rem;
+  border-radius: 9999px;
+  background-color: #ffffff;
+  border: 1px solid var(--border-light);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.ticker-pill:hover {
+  border-color: var(--hero-green);
+  background-color: #f0fdf4;
+}
+
+.ticker-pill.active {
+  background-color: var(--hero-green);
+  color: #ffffff;
+  border-color: var(--hero-green);
+  box-shadow: 0 4px 12px rgba(6, 78, 59, 0.15);
+}
+
+/* Month Navigation Control Bar */
+.month-nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: #ffffff;
+  border: 1px solid var(--border-light);
+  border-radius: 9999px;
+  padding: 0.25rem 0.6rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+}
+
+.month-nav-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.35rem 0.5rem;
+  border-radius: 50%;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+
+
+/* Time-of-Day Hourly Analytics Styles */
+.hourly-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+@media (max-width: 1200px) {
+  .hourly-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+@media (max-width: 768px) {
+  .hourly-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.hourly-card {
+  background-color: #ffffff;
+  border: 1px solid var(--border-light);
+  border-radius: 0.85rem;
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+}
+
+.hourly-card.best-hour {
+  border: 2px solid var(--hero-green);
+  background-color: #f0fdf4;
+}
+
+.hourly-card-time {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.hourly-card-pnl {
+  font-size: 1.05rem;
+  font-weight: 800;
+  margin-bottom: 0.25rem;
+}
+
+.hourly-card-meta {
+  font-size: 0.72rem;
+  color: var(--text-light);
+}
+
+
+
+
