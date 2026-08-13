@@ -2743,6 +2743,48 @@ export default function App() {
                 </div>
               )}
 
+              {/* App Version Info */}
+              <div className="settings-section" style={{ borderTop: '1.5px solid var(--border)', marginTop: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <div>
+                    <div className="settings-title" style={{ marginBottom: '0.25rem' }}>About Hammer Pro Journal</div>
+                    <div className="settings-desc" style={{ marginBottom: 0 }}>
+                      Trading log analytics &amp; session journal for active day traders
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      background: '#ecfdf5',
+                      color: '#047857',
+                      border: '1px solid #a7f3d0',
+                      borderRadius: '999px',
+                      padding: '0.3rem 0.85rem',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      letterSpacing: '0.02em'
+                    }}>
+                      ● v1.0.2
+                    </span>
+                    <a
+                      href="https://github.com/Web-Traveller/hammer-pro-journal/releases"
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        fontSize: '0.78rem',
+                        color: 'var(--text-muted)',
+                        textDecoration: 'none',
+                        borderBottom: '1px dashed var(--border)'
+                      }}
+                    >
+                      View changelog ↗
+                    </a>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
         )}
