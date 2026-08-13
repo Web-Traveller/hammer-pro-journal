@@ -39,3 +39,4 @@ jobs:
           releaseBody: 'Automated release of Hammer Pro Journal v__VERSION__'
           releaseDraft: false
           prerelease: false
+          createUpdaterArtifacts: true
