@@ -1154,40 +1154,58 @@ textarea:focus {
   color: #fca5a5;
 }
 
-/* Finviz Metrics Table Grid - Clean White & Emerald Cards */
-.finviz-metrics-grid {
+/* Finviz Metrics Grouped Layout - Clean 2x2 Grid Panel System */
+.finviz-grouped-cards {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 0.85rem;
-  margin-top: 1.25rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+  margin-top: 1.5rem;
 }
 
-@media (max-width: 1200px) {
-  .finviz-metrics-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-@media (max-width: 768px) {
-  .finviz-metrics-grid {
-    grid-template-columns: repeat(2, 1fr);
+@media (max-width: 900px) {
+  .finviz-grouped-cards {
+    grid-template-columns: 1fr;
   }
 }
 
-.finviz-metric-card {
+.metrics-group-card {
   background-color: #ffffff;
   border: 1px solid var(--border-light);
-  border-radius: 0.85rem;
-  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  transition: all 0.2s ease;
+}
+
+.metrics-group-card:hover {
+  border-color: var(--border-hover);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+}
+
+.metrics-group-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--hero-green);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 0.5rem;
+}
+
+.metrics-inner-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.metric-item {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
-  transition: transform 0.15s ease;
-}
-
-.finviz-metric-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--hero-green);
 }
 
 .finviz-metric-label {
@@ -1200,10 +1218,11 @@ textarea:focus {
 }
 
 .finviz-metric-value {
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 800;
   color: var(--text-main);
 }
+
 
 /* Ticker Pill List for Stock Selection */
 .ticker-pill-bar {

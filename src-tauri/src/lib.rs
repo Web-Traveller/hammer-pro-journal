@@ -115,6 +115,32 @@ fn delete_screenshot(app_handle: tauri::AppHandle, filename: String) -> Result<(
     Ok(())
 }
 
+#[tauri::command]
+fn sync_local_directory(app_handle: tauri::AppHandle, target_dir: String) -> Result<(), String> {
+    if target_dir.trim().is_empty() {
+        return Ok(());
+    }
+    let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let logs_dir = app_dir.join("logs");
+    if !logs_dir.exists() {
+        return Ok(());
+    }
+    let dest_path = std::path::PathBuf::from(&target_dir);
+    fs::create_dir_all(&dest_path).map_err(|e| e.to_string())?;
+    
+    for entry in fs::read_dir(logs_dir).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        if path.is_file() {
+            if let Some(file_name) = path.file_name() {
+                let target_file = dest_path.join(file_name);
+                fs::copy(&path, &target_file).map_err(|e| e.to_string())?;
+            }
+        }
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -127,8 +153,10 @@ pub fn run() {
             get_log_dir,
             save_screenshot,
             load_session_screenshots,
-            delete_screenshot
+            delete_screenshot,
+            sync_local_directory
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+

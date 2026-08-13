@@ -208,8 +208,14 @@ export default function App() {
     r2AccountId: '',
     r2AccessKey: '',
     r2SecretKey: '',
-    r2Bucket: ''
+    r2Bucket: '',
+    silentUpdates: true,
+    gdriveSyncPath: '',
+    gdriveFolderId: '',
+    gdriveAccessToken: '',
+    r2BackupUrl: ''
   });
+
 
   // Session Journal State
   const [journalNotes, setJournalNotes] = useState('');
@@ -273,11 +279,14 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    loadSettingsFromBackend();
-    loadLogsFromBackend();
-    if (isTauri) {
-      checkForAutoUpdates();
+    async function init() {
+      const saved = await loadSettingsFromBackend();
+      await loadLogsFromBackend();
+      if (isTauri) {
+        checkForAutoUpdates(saved);
+      }
     }
+    init();
   }, []);
 
   async function loadSettingsFromBackend() {
@@ -285,9 +294,73 @@ export default function App() {
       const saved = await safeInvoke("load_settings");
       if (saved) {
         setSettings(prev => ({ ...prev, ...saved }));
+        return saved;
       }
     } catch (e) {
       console.error("Failed to load settings:", e);
+    }
+    return null;
+  }
+
+  async function triggerCloudSync(currentSettings = settings) {
+    if (currentSettings.cloudProvider === 'gdrive' && currentSettings.gdriveSyncPath) {
+      try {
+        await safeInvoke("sync_local_directory", { targetDir: currentSettings.gdriveSyncPath });
+      } catch (e) {
+        console.error("Local Google Drive directory sync failed:", e);
+      }
+    }
+
+    if (currentSettings.cloudProvider === 'r2' && currentSettings.r2BackupUrl) {
+      try {
+        const backupData = {
+          logs,
+          journal: {},
+          settings: currentSettings,
+          timestamp: new Date().toISOString()
+        };
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith("trading_journal_")) {
+            backupData.journal[key] = localStorage.getItem(key);
+          }
+        }
+        await fetch(currentSettings.r2BackupUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(backupData)
+        });
+      } catch (e) {
+        console.error("R2 backup upload failed:", e);
+      }
+    }
+
+    if (currentSettings.cloudProvider === 'gdrive_api' && currentSettings.gdriveAccessToken && currentSettings.gdriveFolderId) {
+      try {
+        const backupData = {
+          logs,
+          settings: currentSettings,
+          timestamp: new Date().toISOString()
+        };
+        const metadata = {
+          name: 'hammer_pro_journal_backup.json',
+          mimeType: 'application/json',
+          parents: [currentSettings.gdriveFolderId]
+        };
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        form.append('file', new Blob([JSON.stringify(backupData)], { type: 'application/json' }));
+
+        await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${currentSettings.gdriveAccessToken}`
+          },
+          body: form
+        });
+      } catch (e) {
+        console.error("Google Drive API backup failed:", e);
+      }
     }
   }
 
@@ -295,24 +368,31 @@ export default function App() {
     try {
       setSettings(newSettings);
       await safeInvoke("save_settings", { settings: newSettings });
-      showToast("Settings saved successfully!", "success");
+      await triggerCloudSync(newSettings);
+      showToast("Settings saved and synced successfully!", "success");
     } catch (e) {
       showToast(`Error saving settings: ${e}`, "error");
     }
   }
 
-  async function checkForAutoUpdates() {
+  async function checkForAutoUpdates(currentSettings) {
     try {
       const update = await checkTauriUpdate();
       if (update && update.available) {
-        showToast(`Downloading update v${update.version} in background...`, "info");
+        const isSilent = currentSettings ? currentSettings.silentUpdates : settings.silentUpdates;
+        if (!isSilent) {
+          showToast(`Downloading update v${update.version} in background...`, "info");
+        }
         await update.downloadAndInstall();
-        showToast("Update downloaded! Will apply automatically when you restart.", "success");
+        if (!isSilent) {
+          showToast("Update downloaded! Will apply automatically when you restart.", "success");
+        }
       }
     } catch (e) {
       console.log("No update available or web environment:", e);
     }
   }
+
 
   useEffect(() => {
     if (sessionDate) {
@@ -346,10 +426,12 @@ export default function App() {
     try {
       await safeInvoke("save_journal", { date: sessionDate, content: journalNotes });
       showToast(`Session journal saved for ${sessionDate}!`, "success");
+      await triggerCloudSync();
     } catch (e) {
       showToast(`Error saving journal: ${e}`, "error");
     }
   }
+
 
   async function loadLogsFromBackend() {
     try {
@@ -431,11 +513,13 @@ export default function App() {
         if (completed === files.length) {
           loadSessionScreenshots(sessionDate);
           showToast(`Attached ${files.length} screenshot(s) to ${sessionDate}`, "success");
+          await triggerCloudSync();
         }
       };
       reader.readAsDataURL(file);
     });
   };
+
 
   const handleRemovePendingScreenshot = (index) => {
     setPendingScreenshots(prev => prev.filter((_, i) => i !== index));
@@ -468,10 +552,12 @@ export default function App() {
       setSessionDate(selectedDate);
       setCurrentView('singleSession');
       showToast(`Session log and ${pendingScreenshots.length} screenshot(s) saved for ${selectedDate}`, "success");
+      await triggerCloudSync();
     } catch (e) {
       showToast(`Error saving log: ${e}`, "error");
     }
   };
+
 
   const handleSaveEditedSessionLog = async () => {
     if (!sessionDate) return;
@@ -482,10 +568,12 @@ export default function App() {
         [sessionDate]: editingSessionLog
       }));
       showToast(`Log content for ${sessionDate} updated & re-parsed!`, "success");
+      await triggerCloudSync();
     } catch (e) {
       showToast(`Error updating log: ${e}`, "error");
     }
   };
+
 
   const handleDeleteLog = async (date) => {
     try {
@@ -1975,37 +2063,95 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Finviz Live Metrics Grid matching White & Emerald Design System */}
+                    {/* Grouped Finviz stock metrics into 4 cards with tight 2x2 CSS grid layout */}
                     {stockMarketMeta && stockMarketMeta.metrics && (
-                      <div className="finviz-metrics-grid">
-                        {[
-                          { key: 'Index', label: 'Index' },
-                          { key: 'Market Cap', label: 'Market Cap' },
-                          { key: 'Dividend Ex-Date', label: 'Dividend Ex-Date' },
-                          { key: 'IPO', label: 'IPO Date' },
-                          { key: 'Earnings', label: 'Earnings Report' },
-                          { key: '52W High', label: '52-Week High' },
-                          { key: '52W Low', label: '52-Week Low' },
-                          { key: 'Volatility', label: 'Volatility' },
-                          { key: 'ATR (14)', label: 'ATR (14)' },
-                          { key: 'Avg Volume', label: 'Avg Volume (3M)' },
-                          { key: 'Volume', label: 'Current Volume' },
-                          { key: 'Prev Close', label: 'Prev Close' },
-                          { key: 'Price', label: 'Current Price' },
-                          { key: 'P/E', label: 'P/E Ratio' },
-                          { key: 'Short Float', label: 'Short Float' },
-                          { key: 'Target Price', label: 'Target Price' }
-                        ].map(item => {
-                          const val = stockMarketMeta.metrics[item.key] || stockMarketMeta[item.key.toLowerCase()] || '-';
-                          return (
-                            <div key={item.key} className="finviz-metric-card">
-                              <span className="finviz-metric-label">{item.label}</span>
-                              <span className="finviz-metric-value">{val}</span>
-                            </div>
-                          );
-                        })}
+                      <div className="finviz-grouped-cards">
+                        {/* Card 1: Valuation & Ratios */}
+                        <div className="metrics-group-card">
+                          <div className="metrics-group-title">Valuation & Financial Info</div>
+                          <div className="metrics-inner-grid">
+                            {[
+                              { key: 'Index', label: 'Index' },
+                              { key: 'Market Cap', label: 'Market Cap' },
+                              { key: 'P/E', label: 'P/E Ratio' },
+                              { key: 'Target Price', label: 'Target Price' },
+                              { key: 'Short Float', label: 'Short Float' }
+                            ].map(item => {
+                              const val = stockMarketMeta.metrics[item.key] || stockMarketMeta[item.key.toLowerCase()] || '-';
+                              return (
+                                <div key={item.key} className="metric-item">
+                                  <span className="finviz-metric-label">{item.label}</span>
+                                  <span className="finviz-metric-value">{val}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Card 2: Technicals & Price Range */}
+                        <div className="metrics-group-card">
+                          <div className="metrics-group-title">Technicals & Price Range</div>
+                          <div className="metrics-inner-grid">
+                            {[
+                              { key: 'Price', label: 'Last Price' },
+                              { key: 'Prev Close', label: 'Prev Close' },
+                              { key: 'ATR (14)', label: 'ATR (14)' },
+                              { key: 'Volatility', label: 'Volatility Range' },
+                              { key: '52W High', label: '52-Week High' },
+                              { key: '52W Low', label: '52-Week Low' }
+                            ].map(item => {
+                              const val = stockMarketMeta.metrics[item.key] || stockMarketMeta[item.key.toLowerCase()] || '-';
+                              return (
+                                <div key={item.key} className="metric-item">
+                                  <span className="finviz-metric-label">{item.label}</span>
+                                  <span className="finviz-metric-value">{val}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Card 3: Volume & Liquidity */}
+                        <div className="metrics-group-card">
+                          <div className="metrics-group-title">Volume & Liquidity</div>
+                          <div className="metrics-inner-grid">
+                            {[
+                              { key: 'Volume', label: 'Session Volume' },
+                              { key: 'Avg Volume', label: 'Avg Volume (3M)' },
+                              { key: 'IPO', label: 'IPO Date' }
+                            ].map(item => {
+                              const val = stockMarketMeta.metrics[item.key] || stockMarketMeta[item.key.toLowerCase()] || '-';
+                              return (
+                                <div key={item.key} className="metric-item">
+                                  <span className="finviz-metric-label">{item.label}</span>
+                                  <span className="finviz-metric-value">{val}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Card 4: Corporate Calendar */}
+                        <div className="metrics-group-card">
+                          <div className="metrics-group-title">Corporate Calendar</div>
+                          <div className="metrics-inner-grid">
+                            {[
+                              { key: 'Earnings', label: 'Earnings Release' },
+                              { key: 'Dividend Ex-Date', label: 'Ex-Dividend Date' }
+                            ].map(item => {
+                              const val = stockMarketMeta.metrics[item.key] || stockMarketMeta[item.key.toLowerCase()] || '-';
+                              return (
+                                <div key={item.key} className="metric-item">
+                                  <span className="finviz-metric-label">{item.label}</span>
+                                  <span className="finviz-metric-value">{val}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
                       </div>
                     )}
+
                   </div>
                 )}
 
@@ -2419,7 +2565,22 @@ export default function App() {
                   <span className="form-label" style={{ marginBottom: 0 }}>Enable Session Journaling Tab</span>
                 </label>
               </div>
+
+              <div className="form-group" style={{ marginTop: '0.75rem' }}>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    className="toggle-checkbox"
+                    checked={settings.silentUpdates}
+                    onChange={(e) => handleSaveSettings({ ...settings, silentUpdates: e.target.checked })}
+                    style={{ display: 'none' }}
+                  />
+                  <span className="toggle-slider"></span>
+                  <span className="form-label" style={{ marginBottom: 0 }}>Enable Silent Background Auto-Updates</span>
+                </label>
+              </div>
             </div>
+
 
 
 
@@ -2480,19 +2641,73 @@ export default function App() {
                   className="form-select"
                 >
                   <option value="none">Disabled (Local Machine Storage Only)</option>
+                  <option value="gdrive">Google Drive Local Folder Sync (Free 15GB)</option>
+                  <option value="gdrive_api">Google Drive Direct API Upload (OAuth)</option>
                   <option value="r2">Cloudflare R2 Storage (S3 API - 10GB Free)</option>
-                  <option value="gdrive">Google Drive Folder Sync</option>
                 </select>
               </div>
 
+              {settings.cloudProvider === 'gdrive' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginTop: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Google Drive Desktop Sync Folder Path</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={settings.gdriveSyncPath || ''}
+                      onChange={(e) => handleSaveSettings({ ...settings, gdriveSyncPath: e.target.value })}
+                      placeholder="e.g. C:\Users\Ajinkya\Google Drive\HammerJournal"
+                    />
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      Ensure Google Drive Desktop App is running on your machine. Hammer Pro Journal will copy all session files to this folder for automatic background cloud backup.
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {settings.cloudProvider === 'gdrive_api' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Google Drive Folder ID</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={settings.gdriveFolderId || ''}
+                      onChange={(e) => handleSaveSettings({ ...settings, gdriveFolderId: e.target.value })}
+                      placeholder="Folder ID from Google Drive URL"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Google OAuth Access Token</label>
+                    <input
+                      type="password"
+                      className="form-input"
+                      value={settings.gdriveAccessToken || ''}
+                      onChange={(e) => handleSaveSettings({ ...settings, gdriveAccessToken: e.target.value })}
+                      placeholder="OAuth Access Token"
+                    />
+                  </div>
+                </div>
+              )}
+
               {settings.cloudProvider === 'r2' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
+                  <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                    <label className="form-label">R2 Backup URL / Cloudflare Worker Endpoint</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={settings.r2BackupUrl || ''}
+                      onChange={(e) => handleSaveSettings({ ...settings, r2BackupUrl: e.target.value })}
+                      placeholder="https://your-worker.yourname.workers.dev/backup"
+                    />
+                  </div>
                   <div className="form-group">
                     <label className="form-label">R2 Account ID</label>
                     <input
                       type="text"
                       className="form-input"
-                      value={settings.r2AccountId}
+                      value={settings.r2AccountId || ''}
                       onChange={(e) => handleSaveSettings({ ...settings, r2AccountId: e.target.value })}
                       placeholder="Account ID"
                     />
@@ -2502,7 +2717,7 @@ export default function App() {
                     <input
                       type="text"
                       className="form-input"
-                      value={settings.r2Bucket}
+                      value={settings.r2Bucket || ''}
                       onChange={(e) => handleSaveSettings({ ...settings, r2Bucket: e.target.value })}
                       placeholder="hammer-journal-backup"
                     />
@@ -2512,7 +2727,7 @@ export default function App() {
                     <input
                       type="password"
                       className="form-input"
-                      value={settings.r2AccessKey}
+                      value={settings.r2AccessKey || ''}
                       onChange={(e) => handleSaveSettings({ ...settings, r2AccessKey: e.target.value })}
                     />
                   </div>
@@ -2521,12 +2736,13 @@ export default function App() {
                     <input
                       type="password"
                       className="form-input"
-                      value={settings.r2SecretKey}
+                      value={settings.r2SecretKey || ''}
                       onChange={(e) => handleSaveSettings({ ...settings, r2SecretKey: e.target.value })}
                     />
                   </div>
                 </div>
               )}
+
             </div>
           </div>
         )}
