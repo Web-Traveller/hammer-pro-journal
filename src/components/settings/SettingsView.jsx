@@ -217,19 +217,12 @@ export function SettingsView({
           </label>
         </div>
 
-        {/* Export Tools Section */}
+        {/* Export & Print Tools Section */}
         <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '1.25rem' }}>
           <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-main)', marginBottom: '0.4rem' }}>
-            Export Tools
+            Report Tools
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
-            <button
-              className="btn btn-secondary"
-              onClick={onExportCSV}
-              title="Download CSV spreadsheet of current active session trades"
-            >
-              <Download size={15} /> Export Session CSV
-            </button>
             <button
               className="btn btn-secondary"
               onClick={onPrintReport}

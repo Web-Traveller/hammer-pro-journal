@@ -7,7 +7,8 @@ on:
       - 'v*'
 
 jobs:
-  release:
+  release-desktop:
+    name: Build & Release Desktop (Windows)
     permissions:
       contents: write
     runs-on: windows-latest
@@ -27,7 +28,7 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Build Tauri App and Publish Release
+      - name: Build Tauri Desktop & Publish Release
         uses: tauri-apps/tauri-action@v0.5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -36,7 +37,72 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: 'Hammer Pro Journal v__VERSION__'
-          releaseBody: 'Automated release of Hammer Pro Journal v__VERSION__'
+          releaseBody: 'Hammer Pro Journal v__VERSION__ - Full Cloudflare R2 Sync, Mobile Terminal, and Tape Analytics'
           releaseDraft: false
           prerelease: false
           createUpdaterArtifacts: true
+
+  release-android:
+    name: Build & Attach Android APK
+    needs: release-desktop
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK & Build Tools
+        run: |
+          sdkmanager "ndk;26.1.10909125" "build-tools;34.0.0" "platforms;android-34"
+
+      - name: Set NDK Environment
+        run: |
+          echo "NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125" >> $GITHUB_ENV
+
+      - name: Install Rust Toolchain with Android Targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Initialize Tauri Android (if needed)
+        run: npx tauri android init || true
+
+      - name: Build Android APK
+        run: npx tauri android build --apk --target aarch64
+
+      - name: Find & Rename APK
+        id: find-apk
+        run: |
+          APK_PATH=$(find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          if [ -n "$APK_PATH" ]; then
+            cp "$APK_PATH" ./hammer-pro-journal-v2.0.0-arm64.apk
+            echo "apk_path=./hammer-pro-journal-v2.0.0-arm64.apk" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload APK to GitHub Release
+        if: steps.find-apk.outputs.apk_path != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: ${{ steps.find-apk.outputs.apk_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

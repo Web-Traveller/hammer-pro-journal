@@ -586,6 +586,11 @@ export function compileSingleDayAnalytics(executions, feePerRoundTripShare = 0.0
     const avgLoss = lossTradesCount > 0 ? lossPnlTotal / lossTradesCount : 0;
     const winLossRatio = avgLoss > 0 ? avgWin / avgLoss : avgWin;
 
+    const totalHoldTime = trades.reduce((acc, t) => acc + (t.holdingSeconds || 0), 0);
+    const avgHoldTime = trades.length > 0 ? totalHoldTime / trades.length : 0;
+    const winRate = trades.length > 0 ? (winTradesCount / trades.length) * 100 : 0;
+    const totalShares = totalBoughtQty + totalSoldQty;
+
     // Cents / Share Scalper Metrics
     const avgCentsPerWinShare = winSharesTotal > 0 ? (winPnlTotal / winSharesTotal) * 100 : 0;
     const avgCentsPerLossShare = lossSharesTotal > 0 ? (lossPnlTotal / lossSharesTotal) * 100 : 0;
@@ -739,7 +744,10 @@ export function compileSingleDayAnalytics(executions, feePerRoundTripShare = 0.0
         profitFactor: lossPnlTotal > 0 ? winPnlTotal / lossPnlTotal : (winPnlTotal > 0 ? 99.99 : 0),
         fees: totalFees,
         netPnl,
+        winRate,
+        avgHoldTime,
         roundTripShares,
+        totalShares,
         totalBoughtQty,
         totalSoldQty,
         totalVolume: totalBoughtQty + totalSoldQty,
@@ -760,6 +768,8 @@ export function compileSingleDayAnalytics(executions, feePerRoundTripShare = 0.0
         netCentsPerShare,
         pnlPer1kShares,
         holdTimeBuckets,
+        winTradesCount,
+        lossTradesCount,
         winningTrades: winTradesCount,
         losingTrades: lossTradesCount,
         openPositionsSummary,

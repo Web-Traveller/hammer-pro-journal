@@ -29,17 +29,22 @@ import {
   getActiveUserProfile,
   subscribeSyncStatus,
   executeTwoTierSync,
-  fetchOnDemandSessionLog
+  fetchOnDemandSessionLog,
+  deleteSessionFromCloud
 } from '../services/authService';
 import { compressScreenshot } from '../utils/imageCompression';
+import { checkAppVersionStatus } from '../services/versionService';
+import { checkLicenseAndAccess } from '../services/licenseService';
 
 // Safe Tauri updater loader
 async function checkTauriUpdate() {
+  if (typeof window === 'undefined' || (!window.__TAURI_INTERNALS__ && !window.__TAURI__)) {
+    return null;
+  }
   try {
     const { check } = await import('@tauri-apps/plugin-updater');
     return await check();
   } catch (err) {
-    console.log("Tauri updater plugin not loaded in browser dev mode:", err);
     return null;
   }
 }
@@ -76,6 +81,8 @@ export function useTradingState() {
   const [preImportReport, setPreImportReport] = useState(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateStatus, setUpdateStatus] = useState('');
+  const [versionStatus, setVersionStatus] = useState(null);
+  const [licenseCheck, setLicenseCheck] = useState(null);
 
   // Dashboard Horizon Filter
   const [dashboardMonthFilter, setDashboardMonthFilter] = useState('ALL');
@@ -145,8 +152,8 @@ export function useTradingState() {
         setLogs(prev => ({ ...prev, ...statusPayload.syncedLogs }));
         const sorted = Object.keys(statusPayload.syncedLogs).sort().reverse();
         if (sorted.length > 0) {
-          setSessionDate(prev => prev || sorted[0]);
-          setSelectedDate(prev => prev || sorted[0]);
+          setSessionDate(prev => (prev && statusPayload.syncedLogs[prev] ? prev : sorted[0]));
+          setSelectedDate(prev => (prev && statusPayload.syncedLogs[prev] ? prev : sorted[0]));
         }
       }
     });
@@ -208,8 +215,13 @@ export function useTradingState() {
     }
     initData();
 
-    // Auto-sync on window focus (switching between laptops / tabs)
+    // Auto-sync on window focus (switching between laptops / tabs) with 60s cooldown
+    let lastFocusSyncTime = 0;
     const handleWindowFocus = () => {
+      const now = Date.now();
+      if (now - lastFocusSyncTime < 60000) return; // Skip if synced within last 60 seconds
+      lastFocusSyncTime = now;
+
       const p = getActiveUserProfile();
       if (p && p.cloudProvider === 'supabase_cloud') {
         executeTwoTierSync();
@@ -236,6 +248,23 @@ export function useTradingState() {
     const timer = setTimeout(runSilentUpdate, 4000);
     return () => clearTimeout(timer);
   }, [settings.silentUpdates]);
+
+  // Version Gate & 7-Day Hard Expiry Checker
+  useEffect(() => {
+    checkAppVersionStatus().then(status => {
+      if (status) setVersionStatus(status);
+    });
+  }, []);
+
+  // Cloud Licensing & Remote Device Lock Checker
+  const handleRecheckLicense = async () => {
+    const res = await checkLicenseAndAccess(userProfile);
+    if (res) setLicenseCheck(res);
+  };
+
+  useEffect(() => {
+    handleRecheckLicense();
+  }, [userProfile]);
 
   // Load Session-Specific Data (with On-Demand Lazy Cloud Download)
   useEffect(() => {
@@ -437,6 +466,15 @@ export function useTradingState() {
           stockMap[s.symbol].grossPnl += s.pnl || 0;
           stockMap[s.symbol].netPnl += (s.netPnl ?? s.pnl) || 0;
           stockMap[s.symbol].tradesCount += s.tradesCount || 0;
+          
+          // Accumulate winning trades accurately
+          const stockWins = s.wins !== undefined
+            ? s.wins
+            : (s.winRate !== undefined
+                ? Math.round((s.winRate / 100) * (s.tradesCount || 1))
+                : ((s.pnl || 0) > 0 ? (s.tradesCount || 1) : 0));
+          stockMap[s.symbol].winningTrades += stockWins;
+
           stockMap[s.symbol].volume += s.totalQty || 0;
           stockMap[s.symbol].roundTripShares += s.roundTripShares || 0;
           stockMap[s.symbol].totalHoldTime += (s.avgHoldTime || 0) * (s.tradesCount || 1);
@@ -538,7 +576,13 @@ export function useTradingState() {
           totalShares += item.totalQty || 0;
           totalTrades += item.tradesCount || 0;
 
-          const winsInSession = item.matchedTrades ? item.matchedTrades.filter(t => (t.pnl || 0) > 0).length : 0;
+          const winsInSession = item.matchedTrades && item.matchedTrades.length > 0
+            ? item.matchedTrades.filter(t => (t.pnl || 0) > 0).length
+            : (item.wins !== undefined
+                ? item.wins
+                : (item.winRate !== undefined
+                    ? Math.round((item.winRate / 100) * (item.tradesCount || 1))
+                    : ((item.pnl || 0) > 0 ? (item.tradesCount || 1) : 0)));
           wins += winsInSession;
 
           const buys = item.executions ? item.executions.filter(e => e.action === 'Bought') : [];
@@ -865,7 +909,9 @@ export function useTradingState() {
     setSessionDate(remaining[0] || '');
     setDeleteConfirmationDate(null);
     showToast(`Session ${date} deleted.`, "info");
-    executeTwoTierSync(dailyStatsMap, { explicitLogs: updated });
+    
+    // Permanently remove from Cloudflare R2 + Supabase and update snapshot
+    await deleteSessionFromCloud(date);
   };
 
   const handleDeleteLog = async (date) => {
@@ -912,7 +958,7 @@ export function useTradingState() {
         setUpdateStatus(`Update v${update.version} ready! Restart Hammer Pro Journal to apply.`);
         showToast(`Update v${update.version} downloaded! Restart app to apply.`, "success");
       } else {
-        setUpdateStatus("You are running the latest version of Hammer Pro Journal (v1.0.3).");
+        setUpdateStatus("You are running the latest version of Hammer Pro Journal (v2.0.0).");
         showToast("You are on the latest version!", "info");
       }
     } catch (e) {
@@ -1055,6 +1101,9 @@ export function useTradingState() {
     handlePrintReport,
     handleManualCheckUpdate,
     handleExportBackup,
-    handleImportBackup
+    handleImportBackup,
+    versionStatus,
+    licenseCheck,
+    handleRecheckLicense
   };
 }

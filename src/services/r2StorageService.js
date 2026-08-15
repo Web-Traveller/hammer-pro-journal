@@ -7,7 +7,7 @@
  * 3. Screenshot Images (uploadScreenshotToCloud / downloadScreenshotFromCloud)
  */
 
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
 export const R2_ACCOUNT_ID = '76cdb43cd04ce3235b092defe0eeaeac';
 export const R2_BUCKET = 'hammer-pro-journal';
@@ -122,6 +122,28 @@ export async function downloadRawLogFromCloud(userId, sessionDate) {
   } catch (err) {
     console.warn('R2 download raw log note:', err.message);
     return null;
+  }
+}
+
+/**
+ * Delete raw log file (.txt) from Cloudflare R2
+ */
+export async function deleteRawLogFromCloud(userId, sessionDate) {
+  if (!userId || !sessionDate) return false;
+  const key = `users/${userId}/logs/${sessionDate}.txt`;
+
+  try {
+    const client = getR2Client();
+    const command = new DeleteObjectCommand({
+      Bucket: R2_BUCKET,
+      Key: key
+    });
+    await client.send(command);
+    console.log(`[Cloudflare R2] Deleted raw log: ${key}`);
+    return true;
+  } catch (err) {
+    console.warn('R2 delete raw log note:', err.message);
+    return false;
   }
 }
 

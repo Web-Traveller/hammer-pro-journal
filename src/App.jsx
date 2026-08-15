@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
 import { useTradingState } from './hooks/useTradingState';
 import { smoothIntradayChartOptions, smoothEquityChartOptions } from './utils/chartConfig';
@@ -17,6 +17,10 @@ import { SettingsView } from './components/settings/SettingsView';
 import { PreImportModal } from './components/modals/PreImportModal';
 import { DeleteConfirmModal } from './components/modals/DeleteConfirmModal';
 import { AuthProfileModal } from './components/modals/AuthProfileModal';
+import { ForceUpdateModal } from './components/modals/ForceUpdateModal';
+import { LicenseGateModal } from './components/modals/LicenseGateModal';
+import { MobileApp } from './mobile/MobileApp';
+import { MobileAuthScreen } from './mobile/components/MobileAuthScreen';
 
 import {
   Chart as ChartJS,
@@ -46,6 +50,92 @@ ChartJS.register(
 
 export default function App() {
   const state = useTradingState();
+  const [isMobileMode, setIsMobileMode] = useState(() => {
+    return typeof window !== 'undefined' && window.innerWidth <= 768;
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth <= 768) {
+        setIsMobileMode(true);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Render isolated Mobile Quick-Check App on mobile viewports
+  if (isMobileMode) {
+    if (!state.userProfile) {
+      return (
+        <>
+          {state.toastMessage && (
+            <div className="toast-container">
+              <div className={`toast-item toast-${state.toastMessage.type}`}>
+                {state.toastMessage.type === 'success' && <CheckCircle size={18} />}
+                {state.toastMessage.type === 'error' && <AlertCircle size={18} />}
+                {state.toastMessage.type === 'info' && <Info size={18} />}
+                <span>{state.toastMessage.msg}</span>
+              </div>
+            </div>
+          )}
+          <MobileAuthScreen
+            onLoginSuccess={(profile) => {
+              state.setUserProfile(profile);
+            }}
+            onToast={state.showToast}
+          />
+        </>
+      );
+    }
+
+    return (
+      <>
+        {state.toastMessage && (
+          <div className="toast-container">
+            <div className={`toast-item toast-${state.toastMessage.type}`}>
+              {state.toastMessage.type === 'success' && <CheckCircle size={18} />}
+              {state.toastMessage.type === 'error' && <AlertCircle size={18} />}
+              {state.toastMessage.type === 'info' && <Info size={18} />}
+              <span>{state.toastMessage.msg}</span>
+            </div>
+          </div>
+        )}
+
+        <MobileApp
+          sessionDate={state.sessionDate}
+          setSessionDate={state.setSessionDate}
+          singleSessionAnalytics={state.singleSessionAnalytics}
+          dailyStatsMap={state.dailyStatsMap}
+          timezone={state.timezone}
+          onTimezoneChange={state.handleTimezoneChange}
+          userProfile={state.userProfile}
+          onOpenAuthModal={() => state.setShowAuthModal(true)}
+          syncState={state.syncState}
+          settings={state.settings}
+          onSaveSettings={state.handleSaveSettings}
+        />
+
+        {/* Global Auth Modal */}
+        <AuthProfileModal
+          isOpen={state.showAuthModal}
+          onClose={() => state.setShowAuthModal(false)}
+          onToast={state.showToast}
+          dailyStatsMap={state.dailyStatsMap}
+        />
+
+        {/* 7-Day Hard Expiry & Force Update Modal */}
+        <ForceUpdateModal versionStatus={state.versionStatus} />
+
+        {/* Cloud Licensing & Device Lock Gate */}
+        <LicenseGateModal
+          licenseCheck={state.licenseCheck}
+          userProfile={state.userProfile}
+          onLicenseActivated={state.handleRecheckLicense}
+        />
+      </>
+    );
+  }
 
   return (
     <div className="app-container">
@@ -265,6 +355,16 @@ export default function App() {
           date={state.deleteConfirmationDate}
           onClose={() => state.setDeleteConfirmationDate(null)}
           onConfirm={state.handleConfirmDeleteLog}
+        />
+
+        {/* 7-DAY HARD EXPIRY & MANDATORY FORCE UPDATE MODAL */}
+        <ForceUpdateModal versionStatus={state.versionStatus} />
+
+        {/* CRYPTOGRAPHIC CLOUD LICENSING & DEVICE LOCK GATE */}
+        <LicenseGateModal
+          licenseCheck={state.licenseCheck}
+          userProfile={state.userProfile}
+          onLicenseActivated={state.handleRecheckLicense}
         />
       </div>
     </div>

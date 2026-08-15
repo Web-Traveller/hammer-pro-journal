@@ -22,10 +22,12 @@ import {
   downloadMasterSnapshot,
   uploadRawLogToCloud,
   downloadRawLogFromCloud,
+  deleteRawLogFromCloud,
   uploadScreenshotToCloud,
   downloadScreenshotFromCloud
 } from './r2StorageService';
 import { parseLogFile } from '../parser';
+import { computeContentHash } from '../utils/checksum';
 
 const AUTH_STORAGE_KEY = 'hammer_user_profile';
 
@@ -269,8 +271,6 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}) {
     return { success: false, error: 'Please sign in to enable Hammer Pro Cloud Sync.' };
   }
 
-  notifySyncStatus('syncing', 'Syncing trading data with Cloudflare R2...');
-
   try {
     const settings = (await loadSettingsFromStorage()) || {};
     const provider = profile.cloudProvider || settings.cloudProvider || 'supabase_cloud';
@@ -278,7 +278,39 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}) {
     if (provider === 'supabase_cloud') {
       const diskLogs = await retrieveAllLogs();
       const allLocalLogs = { ...diskLogs, ...(options.explicitLogs || {}) };
-      const localDates = Object.keys(allLocalLogs);
+      const localDates = Object.keys(allLocalLogs).sort();
+
+      // Compute cryptographic SHA-256 hash of current local state
+      const localFingerprint = await computeContentHash(JSON.stringify(allLocalLogs));
+
+      // Fetch remote snapshot fingerprint from Supabase (lightweight metadata check)
+      let remoteHash = null;
+      try {
+        const { data: dbProfile, error: dbErr } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', profile.id)
+          .maybeSingle();
+        if (!dbErr && dbProfile && dbProfile.snapshot_hash) {
+          remoteHash = dbProfile.snapshot_hash;
+        }
+      } catch (e) {
+        // Fallback gracefully without error
+      }
+
+      // FAST PATH: If remote hash matches local fingerprint and we have logs, skip all R2 requests!
+      if (!options.explicitLogs && remoteHash && remoteHash === localFingerprint && localDates.length > 0) {
+        profile.lastSyncTimestamp = Date.now();
+        saveActiveUserProfile(profile);
+        notifySyncStatus('synced', 'All sessions synced across devices!', {
+          profile,
+          syncedLogs: allLocalLogs,
+          hasNewLogs: false
+        });
+        return { success: true, mode: 'cloud', syncedLogs: allLocalLogs, hasNewLogs: false, skippedR2: true };
+      }
+
+      notifySyncStatus('syncing', 'Syncing trading data with Cloudflare R2...');
 
       // ==========================================
       // STEP 1: PUSH (Local Disk -> Cloudflare R2 + Supabase)
@@ -354,7 +386,7 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}) {
       // 1. Upload Master Snapshot JSON to Cloudflare R2
       if (localDates.length > 0) {
         const masterSnapshotPayload = {
-          version: '1.0.3',
+          version: '2.0.0',
           userId: profile.id,
           updatedAt: new Date().toISOString(),
           sessions: masterSessionsSummary
@@ -379,22 +411,24 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}) {
       let syncedNewLogs = false;
       const updatedLocalLogs = { ...allLocalLogs };
 
-      // A. Pull Master Snapshot from Cloudflare R2
-      const cloudSnapshot = await downloadMasterSnapshot(profile.id);
-      if (cloudSnapshot && cloudSnapshot.sessions) {
-        for (const sDate of Object.keys(cloudSnapshot.sessions)) {
-          const item = cloudSnapshot.sessions[sDate];
-          if (item && item.journalNote) {
-            await saveJournalToStorage(sDate, item.journalNote);
-          }
+      // A. Pull Master Snapshot from Cloudflare R2 if local was empty or remote differed
+      if (localDates.length === 0 || remoteHash !== localFingerprint) {
+        const cloudSnapshot = await downloadMasterSnapshot(profile.id);
+        if (cloudSnapshot && cloudSnapshot.sessions) {
+          for (const sDate of Object.keys(cloudSnapshot.sessions)) {
+            const item = cloudSnapshot.sessions[sDate];
+            if (item && item.journalNote) {
+              await saveJournalToStorage(sDate, item.journalNote);
+            }
 
-          // If this session log is not yet on this device's disk, pull it from R2!
-          if (!updatedLocalLogs[sDate]) {
-            const rawLogFromR2 = await downloadRawLogFromCloud(profile.id, sDate);
-            if (rawLogFromR2) {
-              await persistLog(sDate, rawLogFromR2);
-              updatedLocalLogs[sDate] = rawLogFromR2;
-              syncedNewLogs = true;
+            // If this session log is not yet on this device's disk, pull it from R2!
+            if (!updatedLocalLogs[sDate]) {
+              const rawLogFromR2 = await downloadRawLogFromCloud(profile.id, sDate);
+              if (rawLogFromR2) {
+                await persistLog(sDate, rawLogFromR2);
+                updatedLocalLogs[sDate] = rawLogFromR2;
+                syncedNewLogs = true;
+              }
             }
           }
         }
@@ -423,9 +457,19 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}) {
         }
       }
 
+      // Update snapshot fingerprint in Supabase user_profiles
+      const finalFingerprint = await computeContentHash(JSON.stringify(updatedLocalLogs));
+      try {
+        await supabase
+          .from('user_profiles')
+          .update({ snapshot_hash: finalFingerprint, updated_at: new Date().toISOString() })
+          .eq('id', profile.id);
+      } catch (e) {}
+
       profile.lastSyncTimestamp = Date.now();
       saveActiveUserProfile(profile);
       notifySyncStatus('synced', 'All sessions synced across devices!', {
+        profile,
         syncedLogs: updatedLocalLogs,
         hasNewLogs: syncedNewLogs
       });
@@ -444,5 +488,74 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}) {
     console.error('Two-tier sync error:', err);
     notifySyncStatus('error', err.message || 'Sync encountered an error.');
     return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Permanently deletes a session date from both Cloudflare R2 and Supabase
+ * Prevents deleted sessions from re-syncing from the cloud!
+ */
+export async function deleteSessionFromCloud(sessionDate) {
+  const profile = getActiveUserProfile();
+  if (!profile || !sessionDate) return;
+
+  try {
+    // 1. Delete raw log from Cloudflare R2
+    await deleteRawLogFromCloud(profile.id, sessionDate);
+
+    // 2. Delete metadata row from Supabase daily_session_stats
+    await supabase
+      .from('daily_session_stats')
+      .delete()
+      .eq('user_id', profile.id)
+      .eq('session_date', sessionDate);
+
+    // 3. Rebuild and upload updated Master Snapshot to Cloudflare R2 without deleted session
+    const diskLogs = await retrieveAllLogs();
+    const remainingDates = Object.keys(diskLogs).filter(d => d !== sessionDate);
+    const settings = (await loadSettingsFromStorage()) || {};
+
+    const updatedSessionsSummary = {};
+    for (const d of remainingDates) {
+      const content = diskLogs[d];
+      if (content) {
+        const stats = parseLogFile(content, settings.feePerShare, settings.enableFees, settings.dateFormat, 'US_EASTERN') || {};
+        const journal = await loadJournalFromStorage(d);
+        updatedSessionsSummary[d] = {
+          pnl: stats.pnl || 0,
+          grossPnl: stats.grossPnl || stats.pnl || 0,
+          netPnl: stats.netPnl || stats.pnl || 0,
+          fees: stats.fees || 0,
+          winRate: stats.winRate || 0,
+          totalOrders: stats.totalOrders || 0,
+          roundTripShares: stats.roundTripShares || 0,
+          avgHoldTime: stats.avgHoldTime || 0,
+          profitFactor: stats.profitFactor || 0,
+          journalNote: journal || ''
+        };
+      }
+    }
+
+    const updatedSnapshot = {
+      version: '2.0.0',
+      userId: profile.id,
+      updatedAt: new Date().toISOString(),
+      sessions: updatedSessionsSummary
+    };
+    await uploadMasterSnapshot(profile.id, updatedSnapshot);
+
+    // 4. Update SHA-256 fingerprint in Supabase
+    const updatedFingerprint = await computeContentHash(JSON.stringify(diskLogs));
+    await supabase
+      .from('user_profiles')
+      .update({ snapshot_hash: updatedFingerprint, updated_at: new Date().toISOString() })
+      .eq('id', profile.id);
+
+    profile.lastSyncTimestamp = Date.now();
+    saveActiveUserProfile(profile);
+    notifySyncStatus('synced', `Session ${sessionDate} removed from cloud & local storage.`);
+    console.log(`[Cloud Sync] Permanently deleted session ${sessionDate} from cloud.`);
+  } catch (err) {
+    console.error('Error deleting session from cloud:', err);
   }
 }
