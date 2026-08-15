@@ -26,3 +26,4 @@ yarn-debug.log*
 
 logs-res
 tauri-update-key.txt
+scratch/

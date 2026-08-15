@@ -1,0 +1,448 @@
+/**
+ * AuthService & Live Supabase + Cloudflare R2 Sync Manager
+ * Supports:
+ * 1. Live Supabase Authentication & User Profiles Table Sync
+ * 2. Master Journal Snapshot (1-file instant boot for cross-device sync)
+ * 3. Complete Two-Way Cross-Device Sync (Pushes all local logs to R2 & Pulls all cloud logs to new devices)
+ * 4. 100% Offline Local Mode
+ */
+
+import { supabase } from './supabaseClient';
+import {
+  retrieveAllLogs,
+  persistLog,
+  loadJournalFromStorage,
+  saveJournalToStorage,
+  loadScreenshotsFromStorage,
+  saveScreenshotsToStorage,
+  loadSettingsFromStorage
+} from './storageService';
+import {
+  uploadMasterSnapshot,
+  downloadMasterSnapshot,
+  uploadRawLogToCloud,
+  downloadRawLogFromCloud,
+  uploadScreenshotToCloud,
+  downloadScreenshotFromCloud
+} from './r2StorageService';
+import { parseLogFile } from '../parser';
+
+const AUTH_STORAGE_KEY = 'hammer_user_profile';
+
+// Pub/Sub listeners for header/sidebar sync indicators
+const syncListeners = new Set();
+
+export function subscribeSyncStatus(listener) {
+  syncListeners.add(listener);
+  return () => syncListeners.delete(listener);
+}
+
+function notifySyncStatus(status, message = '', extra = {}) {
+  const payload = { status, message, timestamp: Date.now(), ...extra };
+  syncListeners.forEach(fn => {
+    try { fn(payload); } catch (e) {}
+  });
+}
+
+/**
+ * Get active user profile
+ */
+export function getActiveUserProfile() {
+  try {
+    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Persist user profile locally
+ */
+export function saveActiveUserProfile(profile) {
+  try {
+    if (!profile) {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+    } else {
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(profile));
+    }
+    notifySyncStatus(profile ? 'synced' : 'local_only', 'Profile updated', { profile });
+  } catch (e) {
+    console.error('Error saving user profile:', e);
+  }
+}
+
+/**
+ * Sign Up with Live Supabase Auth & Create Profile in user_profiles Table
+ */
+export async function signUpUser(name, email, password, options = {}) {
+  if (!email || !password) {
+    throw new Error('Email and password are required.');
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(cleanEmail)) {
+    throw new Error('Please enter a valid email address.');
+  }
+  if (password.length < 6) {
+    throw new Error('Password must be at least 6 characters.');
+  }
+
+  const cleanName = (name || cleanEmail.split('@')[0]).trim();
+
+  // 1. Live Supabase Auth SignUp
+  const { data, error } = await supabase.auth.signUp({
+    email: cleanEmail,
+    password: password,
+    options: {
+      data: {
+        name: cleanName
+      }
+    }
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const user = data.user;
+  if (!user) {
+    throw new Error('Registration failed. Please verify your email.');
+  }
+
+  const avatarUrl = `https://api.dicebear.com/7.x/bottts/svg?seed=${user.id}`;
+
+  // 2. Insert into public.user_profiles table
+  try {
+    await supabase.from('user_profiles').upsert({
+      id: user.id,
+      name: cleanName,
+      email: cleanEmail,
+      plan_tier: 'free',
+      avatar_url: avatarUrl,
+      updated_at: new Date().toISOString()
+    });
+  } catch (profileErr) {
+    console.warn('user_profiles insert note:', profileErr);
+  }
+
+  const newProfile = {
+    id: user.id,
+    name: cleanName,
+    email: cleanEmail,
+    planTier: 'free',
+    avatarUrl,
+    createdAt: user.created_at || new Date().toISOString(),
+    lastSyncTimestamp: Date.now(),
+    cloudProvider: options.cloudProvider || 'supabase_cloud'
+  };
+
+  saveActiveUserProfile(newProfile);
+  return newProfile;
+}
+
+/**
+ * Sign In with Live Supabase Auth & Fetch Profile
+ */
+export async function signInUser(email, password) {
+  if (!email || !password) {
+    throw new Error('Email and password are required.');
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+
+  // 1. Live Supabase Auth SignIn
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: cleanEmail,
+    password: password
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const user = data.user;
+  if (!user) {
+    throw new Error('Invalid email or password.');
+  }
+
+  // 2. Query user_profiles table
+  let profileName = user.user_metadata?.name || cleanEmail.split('@')[0];
+  let planTier = user.user_metadata?.planTier || 'free';
+  let avatarUrl = `https://api.dicebear.com/7.x/bottts/svg?seed=${user.id}`;
+
+  try {
+    const { data: dbProfile } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (dbProfile) {
+      if (dbProfile.name) profileName = dbProfile.name;
+      if (dbProfile.plan_tier) planTier = dbProfile.plan_tier;
+      if (dbProfile.avatar_url) avatarUrl = dbProfile.avatar_url;
+    } else {
+      // Upsert profile if missing
+      await supabase.from('user_profiles').upsert({
+        id: user.id,
+        name: profileName,
+        email: cleanEmail,
+        plan_tier: planTier,
+        avatar_url: avatarUrl
+      });
+    }
+  } catch (e) {
+    console.warn('Profile fetch note:', e);
+  }
+
+  const profile = {
+    id: user.id,
+    name: profileName,
+    email: cleanEmail,
+    planTier,
+    avatarUrl,
+    createdAt: user.created_at || new Date().toISOString(),
+    lastSyncTimestamp: Date.now(),
+    cloudProvider: 'supabase_cloud'
+  };
+
+  saveActiveUserProfile(profile);
+  return profile;
+}
+
+/**
+ * Sign Out
+ */
+export async function signOutUser() {
+  try {
+    await supabase.auth.signOut();
+  } catch (e) {}
+  saveActiveUserProfile(null);
+  notifySyncStatus('local_only', 'Signed out. Working in local offline mode.');
+}
+
+/**
+ * Update Profile
+ */
+export function updateUserProfile(updates) {
+  const current = getActiveUserProfile();
+  if (!current) return null;
+  const updated = { ...current, ...updates, lastModified: Date.now() };
+  saveActiveUserProfile(updated);
+  return updated;
+}
+
+/**
+ * Fetch a single session's raw log on-demand (Lazy Loading)
+ */
+export async function fetchOnDemandSessionLog(sessionDate) {
+  if (!sessionDate) return null;
+  const profile = getActiveUserProfile();
+  if (!profile) return null;
+
+  try {
+    const rawLog = await downloadRawLogFromCloud(profile.id, sessionDate);
+    if (rawLog) {
+      await persistLog(sessionDate, rawLog);
+      return rawLog;
+    }
+  } catch (err) {
+    console.warn('Lazy fetch log warning:', err);
+  }
+  return null;
+}
+
+/**
+ * Two-Way Full Sync (Cloudflare R2 + Supabase)
+ * 1. PUSH: Iterates over ALL local logs, uploads heavy .txt files & screenshots to R2,
+ *          assembles Master Snapshot with full metrics, and updates Supabase daily_session_stats.
+ * 2. PULL: Reads Master Snapshot from R2 & Supabase, downloads missing session logs to local disk,
+ *          and returns all merged sessions so Device 2 immediately shows all past trade history!
+ */
+export async function executeTwoTierSync(dailyStatsMap = {}, options = {}) {
+  const profile = getActiveUserProfile();
+  if (!profile) {
+    notifySyncStatus('local_only', 'Local offline mode active.');
+    return { success: false, error: 'Please sign in to enable Hammer Pro Cloud Sync.' };
+  }
+
+  notifySyncStatus('syncing', 'Syncing trading data with Cloudflare R2...');
+
+  try {
+    const settings = (await loadSettingsFromStorage()) || {};
+    const provider = profile.cloudProvider || settings.cloudProvider || 'supabase_cloud';
+
+    if (provider === 'supabase_cloud') {
+      const diskLogs = await retrieveAllLogs();
+      const allLocalLogs = { ...diskLogs, ...(options.explicitLogs || {}) };
+      const localDates = Object.keys(allLocalLogs);
+
+      // ==========================================
+      // STEP 1: PUSH (Local Disk -> Cloudflare R2 + Supabase)
+      // ==========================================
+      const masterSessionsSummary = {};
+      const rowsToUpsert = [];
+
+      for (const dateStr of localDates) {
+        const rawContent = allLocalLogs[dateStr] || '';
+        let stats = dailyStatsMap[dateStr];
+
+        // If dailyStatsMap wasn't computed yet, parse the log directly
+        if (!stats && rawContent) {
+          stats = parseLogFile(rawContent, settings.feePerShare, settings.enableFees, settings.dateFormat, 'US_EASTERN');
+        }
+        stats = stats || {};
+
+        const journal = await loadJournalFromStorage(dateStr);
+        const screenshots = await loadScreenshotsFromStorage(dateStr);
+
+        // Upload heavy raw log to Cloudflare R2
+        let r2LogKey = '';
+        if (rawContent) {
+          r2LogKey = await uploadRawLogToCloud(profile.id, dateStr, rawContent);
+        }
+
+        // Upload compressed screenshots to Cloudflare R2
+        const screenshotKeys = [];
+        for (const img of screenshots) {
+          if (img.dataUrl) {
+            const key = await uploadScreenshotToCloud(profile.id, dateStr, img.filename, img.dataUrl);
+            if (key) screenshotKeys.push({ filename: img.filename, key });
+          }
+        }
+
+        const summaryItem = {
+          pnl: stats.pnl || 0,
+          grossPnl: stats.grossPnl || stats.pnl || 0,
+          netPnl: stats.netPnl || stats.pnl || 0,
+          fees: stats.fees || 0,
+          winRate: stats.winRate || 0,
+          totalOrders: stats.totalOrders || 0,
+          roundTripShares: stats.roundTripShares || 0,
+          avgHoldTime: stats.avgHoldTime || 0,
+          profitFactor: stats.profitFactor || 0,
+          stockBreakdown: stats.stockBreakdown || [],
+          journalNote: journal || '',
+          r2LogKey: r2LogKey || '',
+          screenshotsKeys: screenshotKeys
+        };
+
+        masterSessionsSummary[dateStr] = summaryItem;
+
+        rowsToUpsert.push({
+          user_id: profile.id,
+          session_date: dateStr,
+          pnl: summaryItem.pnl,
+          gross_pnl: summaryItem.grossPnl,
+          net_pnl: summaryItem.netPnl,
+          fees: summaryItem.fees,
+          win_rate: summaryItem.winRate,
+          total_trades: summaryItem.totalOrders,
+          round_trip_shares: summaryItem.roundTripShares,
+          avg_hold_seconds: summaryItem.avgHoldTime,
+          profit_factor: summaryItem.profitFactor,
+          journal_note: journal || '',
+          r2_log_key: r2LogKey || '',
+          screenshots_keys: screenshotKeys,
+          updated_at: new Date().toISOString()
+        });
+      }
+
+      // 1. Upload Master Snapshot JSON to Cloudflare R2
+      if (localDates.length > 0) {
+        const masterSnapshotPayload = {
+          version: '1.0.3',
+          userId: profile.id,
+          updatedAt: new Date().toISOString(),
+          sessions: masterSessionsSummary
+        };
+        await uploadMasterSnapshot(profile.id, masterSnapshotPayload);
+      }
+
+      // 2. Upsert metadata rows to Supabase daily_session_stats
+      if (rowsToUpsert.length > 0) {
+        const { error: pushErr } = await supabase
+          .from('daily_session_stats')
+          .upsert(rowsToUpsert, { onConflict: 'user_id,session_date' });
+
+        if (pushErr) {
+          console.warn('Supabase metadata upsert note:', pushErr.message);
+        }
+      }
+
+      // ==========================================
+      // STEP 2: PULL (Cloudflare R2 + Supabase -> Device Local Disk)
+      // ==========================================
+      let syncedNewLogs = false;
+      const updatedLocalLogs = { ...allLocalLogs };
+
+      // A. Pull Master Snapshot from Cloudflare R2
+      const cloudSnapshot = await downloadMasterSnapshot(profile.id);
+      if (cloudSnapshot && cloudSnapshot.sessions) {
+        for (const sDate of Object.keys(cloudSnapshot.sessions)) {
+          const item = cloudSnapshot.sessions[sDate];
+          if (item && item.journalNote) {
+            await saveJournalToStorage(sDate, item.journalNote);
+          }
+
+          // If this session log is not yet on this device's disk, pull it from R2!
+          if (!updatedLocalLogs[sDate]) {
+            const rawLogFromR2 = await downloadRawLogFromCloud(profile.id, sDate);
+            if (rawLogFromR2) {
+              await persistLog(sDate, rawLogFromR2);
+              updatedLocalLogs[sDate] = rawLogFromR2;
+              syncedNewLogs = true;
+            }
+          }
+        }
+      }
+
+      // B. Also check Supabase daily_session_stats for any missing sessions
+      const { data: dbSessions } = await supabase
+        .from('daily_session_stats')
+        .select('*')
+        .eq('user_id', profile.id);
+
+      if (Array.isArray(dbSessions)) {
+        for (const session of dbSessions) {
+          const sDate = session.session_date;
+          if (sDate && !updatedLocalLogs[sDate]) {
+            const rawLog = await downloadRawLogFromCloud(profile.id, sDate);
+            if (rawLog) {
+              await persistLog(sDate, rawLog);
+              updatedLocalLogs[sDate] = rawLog;
+              syncedNewLogs = true;
+            }
+          }
+          if (sDate && session.journal_note) {
+            await saveJournalToStorage(sDate, session.journal_note);
+          }
+        }
+      }
+
+      profile.lastSyncTimestamp = Date.now();
+      saveActiveUserProfile(profile);
+      notifySyncStatus('synced', 'All sessions synced across devices!', {
+        syncedLogs: updatedLocalLogs,
+        hasNewLogs: syncedNewLogs
+      });
+
+      return {
+        success: true,
+        mode: 'cloud',
+        syncedLogs: updatedLocalLogs,
+        hasNewLogs: syncedNewLogs
+      };
+    }
+
+    return { success: true, mode: 'local' };
+
+  } catch (err) {
+    console.error('Two-tier sync error:', err);
+    notifySyncStatus('error', err.message || 'Sync encountered an error.');
+    return { success: false, error: err.message };
+  }
+}
