@@ -323,9 +323,6 @@ export default function App() {
               onManualCheckUpdate={state.handleManualCheckUpdate}
               onExportBackup={state.handleExportBackup}
               onImportBackup={state.handleImportBackup}
-              onExportCSV={state.handleExportCSV}
-              onPrintReport={state.handlePrintReport}
-              activeSessionDate={state.sessionDate}
               userProfile={state.userProfile}
               onOpenAuthModal={() => state.setShowAuthModal(true)}
             />

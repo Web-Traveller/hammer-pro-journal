@@ -4,8 +4,9 @@
  */
 
 import { supabase } from './supabaseClient';
+import { APP_VERSION } from '../version';
 
-export const CURRENT_APP_VERSION = '2.0.0';
+export const CURRENT_APP_VERSION = APP_VERSION;
 const OUTDATED_DETECTED_KEY = 'hammer_outdated_first_seen';
 
 /**

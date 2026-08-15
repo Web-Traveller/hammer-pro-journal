@@ -83,26 +83,35 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Initialize Tauri Android (if needed)
-        run: npx tauri android init || true
+      - name: Initialize Tauri Android & Generate Icons
+        run: |
+          npx tauri icon ./src-tauri/icons/icon.png || true
+          npx tauri android init || true
+          if [ -d "src-tauri/gen/android/app/src/main/res" ]; then
+            cp -r src-tauri/icons/android/* src-tauri/gen/android/app/src/main/res/ || true
+          fi
 
       - name: Build Android APK
         run: npx tauri android build --apk --target aarch64
 
-      - name: Find & Rename APK
-        id: find-apk
+      - name: Sign & Align Android APK
+        id: sign-apk
         run: |
-          APK_PATH=$(find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" | head -n 1)
-          if [ -n "$APK_PATH" ]; then
-            cp "$APK_PATH" ./hammer-pro-journal-v2.0.0-arm64.apk
-            echo "apk_path=./hammer-pro-journal-v2.0.0-arm64.apk" >> $GITHUB_OUTPUT
+          RAW_APK=$(find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          echo "Found RAW APK: $RAW_APK"
+          if [ -n "$RAW_APK" ]; then
+            keytool -genkey -v -keystore release.keystore -alias hammerpro -keyalg RSA -keysize 2048 -validity 10000 -storepass hammerpro123 -keypass hammerpro123 -dname "CN=HammerPro, OU=Trading, O=HammerPro, L=US, S=NY, C=US"
+            $ANDROID_HOME/build-tools/34.0.0/zipalign -v -p 4 "$RAW_APK" ./aligned.apk
+            $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks release.keystore --ks-pass pass:hammerpro123 --ks-key-alias hammerpro --key-pass pass:hammerpro123 --out ./HammerPro-Journal-v2.0.0-Android.apk ./aligned.apk
+            $ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose ./HammerPro-Journal-v2.0.0-Android.apk
+            echo "apk_path=./HammerPro-Journal-v2.0.0-Android.apk" >> $GITHUB_OUTPUT
           fi
 
-      - name: Upload APK to GitHub Release
-        if: steps.find-apk.outputs.apk_path != ''
+      - name: Upload Signed APK to GitHub Release
+        if: steps.sign-apk.outputs.apk_path != ''
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          files: ${{ steps.find-apk.outputs.apk_path }}
+          files: ${{ steps.sign-apk.outputs.apk_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

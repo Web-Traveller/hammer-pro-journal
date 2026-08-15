@@ -10,6 +10,7 @@ import {
   idbDeleteScreenshot,
   idbDeleteSessionScreenshots
 } from './indexedDbService';
+import { APP_VERSION } from '../version';
 
 export function isTauriEnvironment() {
   return typeof window !== 'undefined' && (window.__TAURI_INTERNALS__ !== undefined || window.__TAURI__ !== undefined);
@@ -249,7 +250,7 @@ export async function createFullBackupSnapshot() {
   }
 
   return {
-    version: "1.0.3",
+    version: APP_VERSION,
     exportedAt: new Date().toISOString(),
     logs: allLogs,
     journals,

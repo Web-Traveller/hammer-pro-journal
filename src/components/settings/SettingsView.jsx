@@ -1,5 +1,6 @@
 import React from 'react';
-import { RefreshCw, Download, Upload, FileText, User, Cloud, ShieldCheck } from 'lucide-react';
+import { RefreshCw, Download, Upload, User, Cloud, ShieldCheck } from 'lucide-react';
+import { APP_VERSION, APP_FULL_NAME } from '../../version';
 
 export function SettingsView({
   settings,
@@ -11,9 +12,6 @@ export function SettingsView({
   onManualCheckUpdate,
   onExportBackup,
   onImportBackup,
-  onExportCSV,
-  onPrintReport,
-  activeSessionDate,
   userProfile,
   onOpenAuthModal
 }) {
@@ -83,7 +81,7 @@ export function SettingsView({
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', backgroundColor: '#f9fafb', border: '1px solid var(--border-light)', borderRadius: '0.75rem', padding: '1rem 1.25rem', marginBottom: '1.25rem' }}>
           <div>
-            <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.95rem' }}>Hammer Pro Journal v1.0.3</div>
+            <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.95rem' }}>{APP_FULL_NAME}</div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
               {updateStatus || "Silent updates active. The app silently downloads new releases on startup and applies on relaunch."}
             </div>
@@ -216,34 +214,13 @@ export function SettingsView({
             <Upload size={16} /> Restore Backup File
           </label>
         </div>
-
-        {/* Export & Print Tools Section */}
-        <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '1.25rem' }}>
-          <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-main)', marginBottom: '0.4rem' }}>
-            Report Tools
-          </div>
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
-            <button
-              className="btn btn-secondary"
-              onClick={onPrintReport}
-              title="Print or Save Session Summary as PDF"
-            >
-              <FileText size={15} /> Print / Save Session PDF
-            </button>
-          </div>
-          {activeSessionDate && (
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.65rem' }}>
-              Active session for export: <strong>{activeSessionDate}</strong>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* APP VERSION INFO */}
       <div className="settings-section" style={{ borderTop: '1.5px solid var(--border)', marginTop: '0.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div>
-            <div className="settings-title" style={{ marginBottom: '0.25rem' }}>About Hammer Pro Journal</div>
+            <div className="settings-title" style={{ marginBottom: '0.25rem' }}>About {APP_NAME}</div>
             <div className="settings-desc" style={{ marginBottom: 0 }}>
               Level 2 tape scalping analytics &amp; session journal for active US equity traders
             </div>
@@ -262,7 +239,7 @@ export function SettingsView({
               fontWeight: 700,
               letterSpacing: '0.02em'
             }}>
-              ● v1.0.3
+              ● v{APP_VERSION}
             </span>
             <a
               href="https://github.com/Web-Traveller/hammer-pro-journal/releases"

@@ -28,6 +28,7 @@ import {
 } from './r2StorageService';
 import { parseLogFile } from '../parser';
 import { computeContentHash } from '../utils/checksum';
+import { APP_VERSION } from '../version';
 
 const AUTH_STORAGE_KEY = 'hammer_user_profile';
 
@@ -386,7 +387,7 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}) {
       // 1. Upload Master Snapshot JSON to Cloudflare R2
       if (localDates.length > 0) {
         const masterSnapshotPayload = {
-          version: '2.0.0',
+          version: APP_VERSION,
           userId: profile.id,
           updatedAt: new Date().toISOString(),
           sessions: masterSessionsSummary
@@ -537,7 +538,7 @@ export async function deleteSessionFromCloud(sessionDate) {
     }
 
     const updatedSnapshot = {
-      version: '2.0.0',
+      version: APP_VERSION,
       userId: profile.id,
       updatedAt: new Date().toISOString(),
       sessions: updatedSessionsSummary

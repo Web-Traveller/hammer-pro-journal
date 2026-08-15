@@ -35,6 +35,7 @@ import {
 import { compressScreenshot } from '../utils/imageCompression';
 import { checkAppVersionStatus } from '../services/versionService';
 import { checkLicenseAndAccess } from '../services/licenseService';
+import { APP_VERSION, APP_FULL_NAME } from '../version';
 
 // Safe Tauri updater loader
 async function checkTauriUpdate() {
@@ -238,15 +239,22 @@ export function useTradingState() {
       try {
         const update = await checkTauriUpdate();
         if (update && update.available) {
-          setUpdateStatus(`Silent update downloaded: v${update.version}. Restart app to apply.`);
+          setUpdateStatus(`Update available: v${update.version}. Downloading in background...`);
+          showToast(`Downloading update v${update.version} in background...`, "info");
           await update.downloadAndInstall();
+          setUpdateStatus(`Update v${update.version} ready! Restart Hammer Pro Journal to apply.`);
+          showToast(`Update v${update.version} downloaded! Restart app to apply.`, "success");
         }
       } catch (e) {
         console.log("Silent update check skipped:", e);
       }
     }
-    const timer = setTimeout(runSilentUpdate, 4000);
-    return () => clearTimeout(timer);
+    const timer = setTimeout(runSilentUpdate, 3500);
+    const interval = setInterval(runSilentUpdate, 30 * 60 * 1000);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, [settings.silentUpdates]);
 
   // Version Gate & 7-Day Hard Expiry Checker
@@ -958,7 +966,7 @@ export function useTradingState() {
         setUpdateStatus(`Update v${update.version} ready! Restart Hammer Pro Journal to apply.`);
         showToast(`Update v${update.version} downloaded! Restart app to apply.`, "success");
       } else {
-        setUpdateStatus("You are running the latest version of Hammer Pro Journal (v2.0.0).");
+        setUpdateStatus(`You are running the latest version of ${APP_FULL_NAME}.`);
         showToast("You are on the latest version!", "info");
       }
     } catch (e) {
