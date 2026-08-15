@@ -1,6 +1,6 @@
 import React from 'react';
 import { RefreshCw, Download, Upload, User, Cloud, ShieldCheck } from 'lucide-react';
-import { APP_VERSION, APP_FULL_NAME } from '../../version';
+import { APP_VERSION, APP_NAME, APP_FULL_NAME } from '../../version';
 
 export function SettingsView({
   settings,
@@ -241,19 +241,6 @@ export function SettingsView({
             }}>
               ● v{APP_VERSION}
             </span>
-            <a
-              href="https://github.com/Web-Traveller/hammer-pro-journal/releases"
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                fontSize: '0.78rem',
-                color: 'var(--text-muted)',
-                textDecoration: 'none',
-                borderBottom: '1px dashed var(--border)'
-              }}
-            >
-              View changelog ↗
-            </a>
           </div>
         </div>
       </div>

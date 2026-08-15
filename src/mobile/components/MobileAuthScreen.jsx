@@ -54,14 +54,17 @@ export function MobileAuthScreen({ onLoginSuccess, onToast }) {
   return (
     <div
       style={{
-        minHeight: '100vh',
+        minHeight: '100dvh',
         width: '100%',
         backgroundColor: '#f4f5f7',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '1.5rem',
+        paddingTop: 'calc(1.5rem + env(safe-area-inset-top, 0px))',
+        paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))',
+        paddingLeft: 'calc(1.5rem + env(safe-area-inset-left, 0px))',
+        paddingRight: 'calc(1.5rem + env(safe-area-inset-right, 0px))',
         boxSizing: 'border-box',
         fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif"
       }}

@@ -195,31 +195,7 @@ export function MobileSettingsSheet({
           </div>
         )}
 
-        {/* ACCOUNT AUTH / SIGN IN */}
-        <button
-          onClick={() => {
-            onClose();
-            onOpenAuthModal();
-          }}
-          style={{
-            backgroundColor: '#ffffff',
-            border: '1.5px solid var(--border-light, #e5e7eb)',
-            borderRadius: '0.85rem',
-            color: 'var(--text-main)',
-            padding: '0.85rem',
-            fontWeight: 800,
-            fontSize: '0.88rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem',
-            cursor: 'pointer',
-            marginTop: '0.5rem'
-          }}
-          type="button"
-        >
-          <User size={17} /> {userProfile ? 'Manage Account Credentials' : 'Sign In with Supabase'}
-        </button>
+
 
         {userProfile && (
           <button
