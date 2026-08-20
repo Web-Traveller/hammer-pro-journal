@@ -29,6 +29,53 @@ export async function safeTauriInvoke(cmd, args = {}) {
 }
 
 /**
+ * Automated Session Revision Backup Engine
+ * Whenever a log file or session is edited or overwritten, creates an automatic
+ * timestamped revision backup (e.g. trading_log_rev_2026-08-18_1724123456789)
+ * and purges revisions older than 14 days to preserve space.
+ */
+export async function saveLogRevisionBackup(date, previousContent) {
+  if (!date || !previousContent || typeof previousContent !== 'string') return;
+  const cleanDate = date.trim();
+  const timestamp = Date.now();
+  const revKey = `trading_log_rev_${cleanDate}_${timestamp}`;
+
+  try {
+    localStorage.setItem(revKey, previousContent);
+    console.log(`[Revision System] Saved backup revision for ${cleanDate}: ${revKey}`);
+  } catch (e) {
+    console.warn("[Revision System] Backup save warning:", e);
+  }
+}
+
+export function cleanExpiredBackupRevisions(maxDays = 14) {
+  try {
+    const maxAgeMs = maxDays * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const keysToRemove = [];
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('trading_log_rev_')) {
+        const parts = key.split('_');
+        const tsStr = parts[parts.length - 1];
+        const ts = parseInt(tsStr, 10);
+        if (!isNaN(ts) && (now - ts > maxAgeMs)) {
+          keysToRemove.push(key);
+        }
+      }
+    }
+
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+    if (keysToRemove.length > 0) {
+      console.log(`[Revision System] Purged ${keysToRemove.length} expired revision backups older than ${maxDays} days.`);
+    }
+  } catch (e) {
+    console.warn("[Revision System] Auto-purge error:", e);
+  }
+}
+
+/**
  * Defensive Save Log - Writes to disk in Tauri and mirrors to localStorage
  */
 export async function persistLog(date, content) {
@@ -37,6 +84,15 @@ export async function persistLog(date, content) {
   }
 
   const cleanDate = date.trim();
+  
+  // If an existing log exists and is being edited, save a revision backup first
+  try {
+    const existing = localStorage.getItem(`trading_log_${cleanDate}`);
+    if (existing && existing !== content) {
+      await saveLogRevisionBackup(cleanDate, existing);
+    }
+  } catch (e) {}
+
   const tauriRes = await safeTauriInvoke("save_log", { date: cleanDate, content });
   
   try {

@@ -1,21 +1,24 @@
 import React, { useState } from 'react';
-import { Key, ShieldAlert, CheckCircle, ArrowRight, Loader, Lock, Mail } from 'lucide-react';
-import { activateLicenseKey } from '../../services/licenseService';
+import { Key, ShieldAlert, CheckCircle, ArrowRight, Loader, Lock, X } from 'lucide-react';
+import { activateLicenseKey, activateTrialSkip } from '../../services/licenseService';
 
-export function LicenseGateModal({ licenseCheck, userProfile, onLicenseActivated }) {
-  if (!licenseCheck || licenseCheck.allowed) return null;
+export function LicenseGateModal({ isOpen = false, licenseCheck, userProfile, onLicenseActivated, onClose }) {
+  const isMandatoryLock = licenseCheck && !licenseCheck.allowed;
+  const showModal = isMandatoryLock || isOpen;
+
+  if (!showModal) return null;
 
   const [inputKey, setInputKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  const isBlocked = licenseCheck.status === 'blocked';
+  const isBlocked = licenseCheck?.status === 'blocked';
 
   const handleActivate = async (e) => {
     e.preventDefault();
     if (!inputKey.trim()) {
-      setErrorMsg('Please enter your license key.');
+      setErrorMsg('Please enter your activation code.');
       return;
     }
 
@@ -25,11 +28,12 @@ export function LicenseGateModal({ licenseCheck, userProfile, onLicenseActivated
     try {
       const res = await activateLicenseKey(inputKey, userProfile);
       if (!res.success) {
-        setErrorMsg(res.error || 'Failed to activate license.');
+        setErrorMsg(res.error || 'Failed to activate code.');
       } else {
-        setSuccessMsg('License activated successfully! Unlocking application...');
+        setSuccessMsg('Activation successful! Unlocking Pro features...');
         setTimeout(() => {
           if (onLicenseActivated) onLicenseActivated();
+          if (onClose) onClose();
         }, 1200);
       }
     } catch (err) {
@@ -56,6 +60,7 @@ export function LicenseGateModal({ licenseCheck, userProfile, onLicenseActivated
     >
       <div
         style={{
+          position: 'relative',
           width: '100%',
           maxWidth: '460px',
           backgroundColor: '#ffffff',
@@ -71,6 +76,29 @@ export function LicenseGateModal({ licenseCheck, userProfile, onLicenseActivated
           boxSizing: 'border-box'
         }}
       >
+        {!isMandatoryLock && onClose && (
+          <button
+            onClick={onClose}
+            style={{
+              position: 'absolute',
+              top: '1rem',
+              right: '1rem',
+              background: '#f1f5f9',
+              border: 'none',
+              borderRadius: '50%',
+              width: '32px',
+              height: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: '#64748b'
+            }}
+          >
+            <X size={16} />
+          </button>
+        )}
+
         {/* ICON */}
         <div
           style={{
@@ -206,11 +234,40 @@ export function LicenseGateModal({ licenseCheck, userProfile, onLicenseActivated
                 <Loader size={18} className="anim-spin" />
               ) : (
                 <>
-                  <span>Activate License &amp; Unlock</span>
+                  <span>Activate Key &amp; Unlock</span>
                   <ArrowRight size={16} />
                 </>
               )}
             </button>
+
+            {!licenseCheck.trialUsed && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  const res = activateTrialSkip();
+                  if (res.success && onLicenseActivated) {
+                    onLicenseActivated();
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  padding: '0.65rem',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  marginTop: '0.25rem',
+                  color: '#475569'
+                }}
+              >
+                Skip for 24-Hour Trial (Local Offline Only • 1-Time Use)
+              </button>
+            )}
+
+            {licenseCheck.trialExpired && (
+              <div style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: 700, marginTop: '0.25rem' }}>
+                Your 24-hour trial period has ended. Activation Code is required to proceed.
+              </div>
+            )}
           </form>
         )}
 

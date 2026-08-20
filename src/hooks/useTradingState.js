@@ -23,7 +23,8 @@ import {
   saveScreenshotsToStorage,
   deleteScreenshotFromStorage,
   createFullBackupSnapshot,
-  restoreBackupSnapshot
+  restoreBackupSnapshot,
+  cleanExpiredBackupRevisions
 } from '../services/storageService';
 import {
   getActiveUserProfile,
@@ -33,7 +34,7 @@ import {
   deleteSessionFromCloud
 } from '../services/authService';
 import { compressScreenshot } from '../utils/imageCompression';
-import { checkAppVersionStatus } from '../services/versionService';
+import { checkAppVersionStatus, checkAndApplySilentUpdate } from '../services/versionService';
 import { checkLicenseAndAccess } from '../services/licenseService';
 import { APP_VERSION, APP_FULL_NAME } from '../version';
 
@@ -84,6 +85,7 @@ export function useTradingState() {
   const [updateStatus, setUpdateStatus] = useState('');
   const [versionStatus, setVersionStatus] = useState(null);
   const [licenseCheck, setLicenseCheck] = useState(null);
+  const [showLicenseModal, setShowLicenseModal] = useState(false);
 
   // Dashboard Horizon Filter
   const [dashboardMonthFilter, setDashboardMonthFilter] = useState('ALL');
@@ -112,7 +114,7 @@ export function useTradingState() {
   // User Settings State
   const [settings, setSettings] = useState({
     dateFormat: 'DD-MM-YY',
-    enableJournal: true,
+    enableJournal: false,
     enableFees: false,
     feePerShare: 0.005,
     silentUpdates: true,
@@ -179,6 +181,7 @@ export function useTradingState() {
   useEffect(() => {
     async function initData() {
       try {
+        cleanExpiredBackupRevisions(14);
         const loadedSettings = await loadSettingsFromStorage();
         if (loadedSettings) {
           setSettings(prev => ({ ...prev, ...loadedSettings }));
@@ -191,7 +194,7 @@ export function useTradingState() {
           const defaultSession = sortedDates[0];
           setSessionDate(defaultSession);
           setSelectedDate(defaultSession);
-          
+
           // Set active year
           const firstYear = parseInt(defaultSession.split('-')[0], 10);
           if (!isNaN(firstYear)) {
@@ -232,21 +235,13 @@ export function useTradingState() {
     return () => window.removeEventListener('focus', handleWindowFocus);
   }, []);
 
-  // Silent Background Updater
+  // Silent Background Auto-Updater (Referenced from ecn-trainer)
   useEffect(() => {
-    if (!settings.silentUpdates) return;
     async function runSilentUpdate() {
       try {
-        const update = await checkTauriUpdate();
-        if (update && update.available) {
-          setUpdateStatus(`Update available: v${update.version}. Downloading in background...`);
-          showToast(`Downloading update v${update.version} in background...`, "info");
-          await update.downloadAndInstall();
-          setUpdateStatus(`Update v${update.version} ready! Restart Hammer Pro Journal to apply.`);
-          showToast(`Update v${update.version} downloaded! Restart app to apply.`, "success");
-        }
+        await checkAndApplySilentUpdate(false, null);
       } catch (e) {
-        console.log("Silent update check skipped:", e);
+        console.log("Silent update check note:", e);
       }
     }
     const timer = setTimeout(runSilentUpdate, 3500);
@@ -255,7 +250,7 @@ export function useTradingState() {
       clearTimeout(timer);
       clearInterval(interval);
     };
-  }, [settings.silentUpdates]);
+  }, []);
 
   // Version Gate & 7-Day Hard Expiry Checker
   useEffect(() => {
@@ -412,6 +407,39 @@ export function useTradingState() {
       });
     });
 
+    // Compute Peak-to-Trough Max Drawdown & Green/Red Days Streaks
+    let maxDrawdown = 0;
+    let runningPeak = 0;
+    let currentWinStreak = 0;
+    let maxWinStreak = 0;
+    let greenDaysCount = 0;
+    let redDaysCount = 0;
+
+    validDates.forEach(dateStr => {
+      const day = dailyStatsMap[dateStr];
+      if (!day) return;
+      const pnlVal = settings.enableFees ? (day.netPnl ?? day.pnl) : (day.grossPnl ?? day.pnl);
+
+      if (pnlVal > 0) {
+        greenDaysCount++;
+        currentWinStreak++;
+        if (currentWinStreak > maxWinStreak) maxWinStreak = currentWinStreak;
+      } else if (pnlVal < 0) {
+        redDaysCount++;
+        currentWinStreak = 0;
+      }
+    });
+
+    equityCurve.forEach(pt => {
+      if (pt.cumulativePnl > runningPeak) {
+        runningPeak = pt.cumulativePnl;
+      }
+      const dd = runningPeak - pt.cumulativePnl;
+      if (dd > maxDrawdown) {
+        maxDrawdown = dd;
+      }
+    });
+
     const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
     const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : (grossProfit > 0 ? 99.99 : 0);
     const avgHoldTime = tradesCountForHoldTime > 0 ? totalHoldTimeAcrossTrades / tradesCountForHoldTime : 0;
@@ -441,6 +469,11 @@ export function useTradingState() {
       avgCentsPerWinShare: isNaN(avgCentsPerWinShare) ? 0 : avgCentsPerWinShare,
       avgCentsPerLossShare: isNaN(avgCentsPerLossShare) ? 0 : avgCentsPerLossShare,
       pnlPer1kShares,
+      maxDrawdown,
+      greenDaysCount,
+      redDaysCount,
+      currentWinStreak,
+      maxWinStreak,
       equityCurve
     };
   }, [dailyStatsMap, dashboardMonthFilter, settings.enableFees]);
@@ -474,13 +507,13 @@ export function useTradingState() {
           stockMap[s.symbol].grossPnl += s.pnl || 0;
           stockMap[s.symbol].netPnl += (s.netPnl ?? s.pnl) || 0;
           stockMap[s.symbol].tradesCount += s.tradesCount || 0;
-          
+
           // Accumulate winning trades accurately
           const stockWins = s.wins !== undefined
             ? s.wins
             : (s.winRate !== undefined
-                ? Math.round((s.winRate / 100) * (s.tradesCount || 1))
-                : ((s.pnl || 0) > 0 ? (s.tradesCount || 1) : 0));
+              ? Math.round((s.winRate / 100) * (s.tradesCount || 1))
+              : ((s.pnl || 0) > 0 ? (s.tradesCount || 1) : 0));
           stockMap[s.symbol].winningTrades += stockWins;
 
           stockMap[s.symbol].volume += s.totalQty || 0;
@@ -587,10 +620,10 @@ export function useTradingState() {
           const winsInSession = item.matchedTrades && item.matchedTrades.length > 0
             ? item.matchedTrades.filter(t => (t.pnl || 0) > 0).length
             : (item.wins !== undefined
-                ? item.wins
-                : (item.winRate !== undefined
-                    ? Math.round((item.winRate / 100) * (item.tradesCount || 1))
-                    : ((item.pnl || 0) > 0 ? (item.tradesCount || 1) : 0)));
+              ? item.wins
+              : (item.winRate !== undefined
+                ? Math.round((item.winRate / 100) * (item.tradesCount || 1))
+                : ((item.pnl || 0) > 0 ? (item.tradesCount || 1) : 0)));
           wins += winsInSession;
 
           const buys = item.executions ? item.executions.filter(e => e.action === 'Bought') : [];
@@ -806,6 +839,11 @@ export function useTradingState() {
 
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files);
+    const maxAllowed = licenseCheck?.features?.max_screenshots || (licenseCheck?.status === 'trial_active' ? 1 : 999);
+    if (pendingScreenshots.length + files.length > maxAllowed) {
+      showToast(`Screenshot limit reached (${maxAllowed} per session on your plan).`, 'error');
+      return;
+    }
     files.forEach(async (file) => {
       try {
         const compressed = await compressScreenshot(file, 1920, 0.82);
@@ -823,6 +861,11 @@ export function useTradingState() {
   const handleInlineScreenshotSelect = async (e) => {
     if (!sessionDate) return;
     const files = Array.from(e.target.files);
+    const maxAllowed = licenseCheck?.features?.max_screenshots || (licenseCheck?.status === 'trial_active' ? 1 : 999);
+    if (sessionScreenshots.length + files.length > maxAllowed) {
+      showToast(`Screenshot limit reached (${maxAllowed} per session on your plan).`, 'error');
+      return;
+    }
     const newImgs = [];
     for (const file of files) {
       try {
@@ -877,7 +920,7 @@ export function useTradingState() {
       setPreImportReport(null);
       setCurrentView('singleSession');
       showToast(`Session successfully imported for ${dateToUse}!`, "success");
-      
+
       // Auto-trigger background two-tier cloud sync immediately with explicit updated logs
       executeTwoTierSync(dailyStatsMap, { explicitLogs: updatedLogs });
     } catch (err) {
@@ -917,7 +960,7 @@ export function useTradingState() {
     setSessionDate(remaining[0] || '');
     setDeleteConfirmationDate(null);
     showToast(`Session ${date} deleted.`, "info");
-    
+
     // Permanently remove from Cloudflare R2 + Supabase and update snapshot
     await deleteSessionFromCloud(date);
   };
@@ -1109,9 +1152,10 @@ export function useTradingState() {
     handlePrintReport,
     handleManualCheckUpdate,
     handleExportBackup,
-    handleImportBackup,
     versionStatus,
     licenseCheck,
-    handleRecheckLicense
+    handleRecheckLicense,
+    showLicenseModal,
+    setShowLicenseModal
   };
 }

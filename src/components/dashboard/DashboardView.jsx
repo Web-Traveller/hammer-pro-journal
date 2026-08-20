@@ -175,13 +175,15 @@ export function DashboardView({
 
         <div className="scalper-card">
           <div className="scalper-card-title">
-            <span>PnL per 1k Shares</span>
-            <DollarSign size={14} color="#8b5cf6" />
+            <span>Max Equity Drawdown</span>
+            <DollarSign size={14} color="#f43f5e" />
           </div>
-          <div className="scalper-card-val" style={{ color: (filteredDashboardAnalytics.pnlPer1kShares || 0) >= 0 ? 'var(--hero-green)' : 'var(--rose-text)' }}>
-            {(filteredDashboardAnalytics.pnlPer1kShares || 0) >= 0 ? '+' : ''}${(filteredDashboardAnalytics.pnlPer1kShares || 0).toFixed(2)}
+          <div className="scalper-card-val" style={{ color: (filteredDashboardAnalytics.maxDrawdown || 0) > 0 ? 'var(--rose-text)' : 'var(--hero-green)' }}>
+            {(filteredDashboardAnalytics.maxDrawdown || 0) > 0 ? `-$${(filteredDashboardAnalytics.maxDrawdown || 0).toFixed(2)}` : '$0.00'}
           </div>
-          <div className="scalper-card-sub">Volume profitability ratio</div>
+          <div className="scalper-card-sub">
+            {filteredDashboardAnalytics.maxWinStreak > 0 ? `Max Win Streak: ${filteredDashboardAnalytics.maxWinStreak} session(s)` : 'Peak-to-trough max dip'}
+          </div>
         </div>
 
         <div className="scalper-card">

@@ -32,6 +32,16 @@ export function getIntradayChartOptions(curve = []) {
   return {
     responsive: true,
     maintainAspectRatio: false,
+    animation: {
+      duration: 800,
+      easing: 'easeInOutQuart'
+    },
+    elements: {
+      line: {
+        tension: 0.38,
+        cubicInterpolationMode: 'monotone'
+      }
+    },
     interaction: {
       mode: 'index',
       intersect: false
@@ -101,6 +111,16 @@ export const smoothIntradayChartOptions = getIntradayChartOptions([]);
 export const smoothEquityChartOptions = {
   responsive: true,
   maintainAspectRatio: false,
+  animation: {
+    duration: 800,
+    easing: 'easeInOutQuart'
+  },
+  elements: {
+    line: {
+      tension: 0.38,
+      cubicInterpolationMode: 'monotone'
+    }
+  },
   plugins: {
     legend: { display: false },
     tooltip: {

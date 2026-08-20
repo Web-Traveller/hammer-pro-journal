@@ -325,6 +325,7 @@ export default function App() {
               onImportBackup={state.handleImportBackup}
               userProfile={state.userProfile}
               onOpenAuthModal={() => state.setShowAuthModal(true)}
+              licenseCheck={state.licenseCheck}
             />
           )}
         </ErrorBoundary>
@@ -357,11 +358,13 @@ export default function App() {
         {/* 7-DAY HARD EXPIRY & MANDATORY FORCE UPDATE MODAL */}
         <ForceUpdateModal versionStatus={state.versionStatus} />
 
-        {/* CRYPTOGRAPHIC CLOUD LICENSING & DEVICE LOCK GATE */}
+        {/* CRYPTOGRAPHIC CLOUD LICENSING & ACTIVATION GATE */}
         <LicenseGateModal
+          isOpen={state.showLicenseModal}
           licenseCheck={state.licenseCheck}
           userProfile={state.userProfile}
           onLicenseActivated={state.handleRecheckLicense}
+          onClose={() => state.setShowLicenseModal(false)}
         />
       </div>
     </div>

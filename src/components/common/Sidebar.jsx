@@ -11,6 +11,7 @@ import {
   User,
   Cloud
 } from 'lucide-react';
+import { APP_VERSION } from '../../version';
 
 export function Sidebar({ currentView, setCurrentView, userProfile, onOpenAuthModal }) {
   return (
@@ -19,7 +20,7 @@ export function Sidebar({ currentView, setCurrentView, userProfile, onOpenAuthMo
         <Zap size={24} />
         <div className="sidebar-logo-text">
           <span className="sidebar-logo-title">HAMMER PRO JOURNAL</span>
-          <span className="sidebar-logo-author">by Ajinkya</span>
+          <span className="sidebar-logo-author">by Ajinkya • v{APP_VERSION}</span>
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, Download, Upload, User, Cloud, ShieldCheck } from 'lucide-react';
+import { RefreshCw, Download, Upload, User, Cloud, ShieldCheck, Key } from 'lucide-react';
 import { APP_VERSION, APP_NAME, APP_FULL_NAME } from '../../version';
 
 export function SettingsView({
@@ -13,8 +13,11 @@ export function SettingsView({
   onExportBackup,
   onImportBackup,
   userProfile,
-  onOpenAuthModal
+  onOpenAuthModal,
+  licenseCheck
 }) {
+  const isPro = licenseCheck?.status === 'active' && licenseCheck?.features?.allow_cloud_sync;
+
   return (
     <div>
       {/* SECTION 1: USER ACCOUNT & CLOUD BACKUP */}
@@ -49,18 +52,17 @@ export function SettingsView({
             <div>
               <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <span>{userProfile ? userProfile.name : 'Guest User (Offline Local)'}</span>
-                {userProfile && (
-                  <span style={{
-                    fontSize: '0.68rem',
-                    fontWeight: 800,
-                    backgroundColor: '#dcfce7',
-                    color: '#15803d',
-                    padding: '0.15rem 0.5rem',
-                    borderRadius: '999px'
-                  }}>
-                    {userProfile.planTier === 'pro' ? 'PRO MEMBER' : 'FREE PLAN'}
-                  </span>
-                )}
+                <span style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 800,
+                  backgroundColor: isPro ? '#dcfce7' : '#f1f5f9',
+                  color: isPro ? '#15803d' : '#475569',
+                  padding: '0.15rem 0.5rem',
+                  borderRadius: '999px',
+                  border: `1px solid ${isPro ? '#86efac' : '#cbd5e1'}`
+                }}>
+                  {isPro ? 'PRO' : 'BASIC'}
+                </span>
               </div>
               <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                 {userProfile ? userProfile.email : 'Your logs are currently stored locally on this machine.'}
@@ -74,16 +76,32 @@ export function SettingsView({
         </div>
       </div>
 
-      {/* SECTION 2: APP VERSION & AUTO-UPDATES */}
+      {/* SECTION 2: APP VERSION & AUTOMATIC UPDATES */}
       <div className="settings-section">
-        <div className="settings-title">App Version &amp; Auto-Updates</div>
-        <div className="settings-desc">Keep Hammer Pro Journal up-to-date with silent background updates or check manually</div>
+        <div className="settings-title">About {APP_NAME} &amp; Application Updates</div>
+        <div className="settings-desc">Level 2 tape scalping analytics &amp; session journal for active US equity traders</div>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', backgroundColor: '#f9fafb', border: '1px solid var(--border-light)', borderRadius: '0.75rem', padding: '1rem 1.25rem', marginBottom: '1.25rem' }}>
           <div>
-            <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.95rem' }}>{APP_FULL_NAME}</div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
-              {updateStatus || "Silent updates active. The app silently downloads new releases on startup and applies on relaunch."}
+            <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span>{APP_FULL_NAME}</span>
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+                background: '#ecfdf5',
+                color: '#047857',
+                border: '1px solid #a7f3d0',
+                borderRadius: '999px',
+                padding: '0.15rem 0.6rem',
+                fontSize: '0.75rem',
+                fontWeight: 800
+              }}>
+                ● v{APP_VERSION}
+              </span>
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+              {updateStatus || "Automatic background updates active. New releases download silently and apply on app restart."}
             </div>
           </div>
 
@@ -96,20 +114,6 @@ export function SettingsView({
             <RefreshCw size={14} className={checkingUpdate ? 'spin-animation' : ''} />
             {checkingUpdate ? "Checking..." : "Check for Updates Now"}
           </button>
-        </div>
-
-        <div className="form-group">
-          <label className="toggle-switch">
-            <input
-              type="checkbox"
-              className="toggle-checkbox"
-              checked={settings.silentUpdates}
-              onChange={(e) => onSaveSettings({ ...settings, silentUpdates: e.target.checked })}
-              style={{ display: 'none' }}
-            />
-            <span className="toggle-slider"></span>
-            <span className="form-label" style={{ marginBottom: 0 }}>Enable Silent Background Auto-Updates (Zero Disruptions)</span>
-          </label>
         </div>
       </div>
 
@@ -213,35 +217,6 @@ export function SettingsView({
             <input type="file" accept=".json" style={{ display: 'none' }} onChange={onImportBackup} />
             <Upload size={16} /> Restore Backup File
           </label>
-        </div>
-      </div>
-
-      {/* APP VERSION INFO */}
-      <div className="settings-section" style={{ borderTop: '1.5px solid var(--border)', marginTop: '0.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div>
-            <div className="settings-title" style={{ marginBottom: '0.25rem' }}>About {APP_NAME}</div>
-            <div className="settings-desc" style={{ marginBottom: 0 }}>
-              Level 2 tape scalping analytics &amp; session journal for active US equity traders
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              background: '#ecfdf5',
-              color: '#047857',
-              border: '1px solid #a7f3d0',
-              borderRadius: '999px',
-              padding: '0.3rem 0.85rem',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              letterSpacing: '0.02em'
-            }}>
-              ● v{APP_VERSION}
-            </span>
-          </div>
         </div>
       </div>
     </div>

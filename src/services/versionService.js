@@ -109,3 +109,52 @@ export async function checkAppVersionStatus() {
     return { isOutdated: false, forceUpdate: false, currentVersion: CURRENT_APP_VERSION };
   }
 }
+
+/**
+ * Silent Background Auto-Updater Engine (Referenced from ecn-trainer)
+ * Checks for updates in background via @tauri-apps/plugin-updater.
+ * For mandatory/force updates: downloads and installs immediately.
+ * For normal updates: downloads silently in background, then binds an onCloseRequested window hook
+ * to install the update when the app closes or restarts.
+ */
+export async function checkAndApplySilentUpdate(forceUpdate = false, onToast = null) {
+  try {
+    if (typeof window === 'undefined' || (!window.__TAURI_INTERNALS__ && !window.__TAURI__)) {
+      return null;
+    }
+    const { check } = await import('@tauri-apps/plugin-updater');
+    const update = await check();
+
+    if (update && update.available) {
+      console.log('[UPDATER] New update version found:', update.version);
+      if (forceUpdate) {
+        console.log('[UPDATER] Force update required. Downloading & installing immediately...');
+        if (onToast) onToast(`Mandatory update v${update.version} downloading...`, 'info');
+        await update.downloadAndInstall();
+      } else {
+        console.log('[UPDATER] Normal background update. Downloading silently in background...');
+        // 100% silent background download (no user-facing toast popup)
+        await update.download();
+        console.log('[UPDATER] Silent download complete. Registering exit installation hook...');
+
+        try {
+          const { getCurrentWindow } = await import('@tauri-apps/api/window');
+          const appWindow = getCurrentWindow();
+          await appWindow.onCloseRequested(async (event) => {
+            console.log('[UPDATER] Applying update silently on app exit...');
+            event.preventDefault();
+            await update.install();
+          });
+        } catch (winErr) {
+          console.warn('[UPDATER] Could not attach window exit hook:', winErr);
+        }
+      }
+      return update;
+    }
+    return null;
+  } catch (err) {
+    console.warn('[UPDATER] Silent update check note:', err);
+    return null;
+  }
+}
+

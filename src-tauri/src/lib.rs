@@ -20,6 +20,19 @@ fn save_log(app_handle: tauri::AppHandle, date: String, content: String) -> Resu
     let logs_dir = app_dir.join("logs");
     fs::create_dir_all(&logs_dir).map_err(|e| e.to_string())?;
     let file_path = logs_dir.join(format!("{}.txt", clean_date));
+
+    // If file already exists and is being edited, preserve a timestamped backup copy on disk
+    if file_path.exists() {
+        let backups_dir = logs_dir.join("backups");
+        let _ = fs::create_dir_all(&backups_dir);
+        let now_ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        let backup_path = backups_dir.join(format!("{}_{}.txt", clean_date, now_ts));
+        let _ = fs::copy(&file_path, backup_path);
+    }
+
     fs::write(file_path, content).map_err(|e| e.to_string())?;
     Ok(())
 }

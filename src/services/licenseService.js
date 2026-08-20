@@ -32,29 +32,58 @@ export async function getDeviceFingerprint() {
   return 'DEV_' + Math.abs(hash).toString(16).toUpperCase();
 }
 
+const TRIAL_SKIP_KEY = 'hammer_trial_skip_start';
+const ACTIVATED_KEY_STORAGE = 'hammer_activated_license_key';
+
 /**
- * Check if the active device/user has a valid, active license
+ * Get 24-Hour Trial Status
+ */
+export function getTrialStatus() {
+  try {
+    const raw = localStorage.getItem(TRIAL_SKIP_KEY);
+    if (!raw) return { used: false, active: false, hoursLeft: 0 };
+    const skipTime = parseInt(raw, 10);
+    if (isNaN(skipTime)) return { used: false, active: false, hoursLeft: 0 };
+
+    const elapsedMs = Date.now() - skipTime;
+    const trialDurationMs = 24 * 60 * 60 * 1000; // 24 hours
+    if (elapsedMs < trialDurationMs) {
+      const msLeft = trialDurationMs - elapsedMs;
+      const hoursLeft = Math.ceil(msLeft / (1000 * 60 * 60));
+      return { used: true, active: true, hoursLeft };
+    }
+    return { used: true, active: false, hoursLeft: 0, expired: true };
+  } catch (e) {
+    return { used: false, active: false, hoursLeft: 0 };
+  }
+}
+
+/**
+ * Activate 24-Hour Trial Skip (Single-use per device)
+ */
+export function activateTrialSkip() {
+  const trial = getTrialStatus();
+  if (trial.used) {
+    return { success: false, error: 'The 24-hour trial skip has already been used on this device.' };
+  }
+  try {
+    localStorage.setItem(TRIAL_SKIP_KEY, Date.now().toString());
+    return { success: true, hoursLeft: 24 };
+  } catch (e) {
+    return { success: false, error: 'Could not record trial skip.' };
+  }
+}
+
+/**
+ * Check if the active device/user has a valid, active license or valid 24h trial skip
  */
 export async function checkLicenseAndAccess(userProfile = null) {
   const profile = userProfile || getActiveUserProfile();
   const deviceId = await getDeviceFingerprint();
+  const storedKey = localStorage.getItem(ACTIVATED_KEY_STORAGE) || profile?.license_key;
 
   try {
-    // 1. Fetch Global License Enforcement Policy from Supabase app_config
-    const { data: configRow } = await supabase
-      .from('app_config')
-      .select('value')
-      .eq('key', 'license_enforcement')
-      .maybeSingle();
-
-    const policy = configRow?.value || { enabled: false, require_license_key: false };
-
-    // If global license enforcement is turned OFF by admin, grant access
-    if (!policy.enabled) {
-      return { allowed: true, status: 'bypassed', policy };
-    }
-
-    // 2. Check if user profile is explicitly blocked/banned in Supabase
+    // 1. Check if user profile is explicitly blocked/banned in Supabase
     if (profile && profile.id) {
       const { data: dbProfile } = await supabase
         .from('user_profiles')
@@ -70,35 +99,20 @@ export async function checkLicenseAndAccess(userProfile = null) {
           message: 'Your account or device access has been locked by the administrator.'
         };
       }
+    }
 
-      const activeKey = dbProfile?.license_key || profile.license_key;
+    // 2. Verify stored key in Supabase licenses table if available
+    const activeKey = storedKey || profile?.license_key;
 
-      if (policy.require_license_key) {
-        if (!activeKey) {
-          return {
-            allowed: false,
-            status: 'license_required',
-            reason: 'License Key Required',
-            message: 'Please enter a valid Hammer Pro License Key to activate this device.'
-          };
-        }
+    if (activeKey) {
+      const cleanKey = activeKey.trim().toUpperCase();
+      const { data: dbLicense, error: licErr } = await supabase
+        .from('licenses')
+        .select('*')
+        .eq('license_key', cleanKey)
+        .maybeSingle();
 
-        // 3. Verify license key in Supabase licenses table
-        const { data: dbLicense, error: licErr } = await supabase
-          .from('licenses')
-          .select('*')
-          .eq('license_key', activeKey.trim().toUpperCase())
-          .maybeSingle();
-
-        if (licErr || !dbLicense) {
-          return {
-            allowed: false,
-            status: 'invalid_license',
-            reason: 'Invalid License Key',
-            message: 'The license key provided is invalid or has been revoked.'
-          };
-        }
-
+      if (!licErr && dbLicense) {
         if (!dbLicense.is_active) {
           return {
             allowed: false,
@@ -117,23 +131,80 @@ export async function checkLicenseAndAccess(userProfile = null) {
           };
         }
 
-        // Bind device if not bound
-        if (!dbLicense.device_fingerprint) {
+        // Check device capacity limits (e.g. max_users / max_devices)
+        const maxDevs = dbLicense.max_devices || dbLicense.max_users || 1;
+        let boundDevices = Array.isArray(dbLicense.bound_devices) ? dbLicense.bound_devices : [];
+        if (dbLicense.device_fingerprint && !boundDevices.includes(dbLicense.device_fingerprint)) {
+          boundDevices.push(dbLicense.device_fingerprint);
+        }
+
+        if (!boundDevices.includes(deviceId)) {
+          if (boundDevices.length >= maxDevs) {
+            return {
+              allowed: false,
+              status: 'device_limit_reached',
+              reason: 'Device Limit Exceeded',
+              message: `This activation key is limited to ${maxDevs} device(s). Maximum device limit reached.`
+            };
+          }
+          // Bind new device
+          boundDevices.push(deviceId);
           await supabase
             .from('licenses')
-            .update({ device_fingerprint: deviceId, user_id: profile.id })
+            .update({ bound_devices: boundDevices, device_fingerprint: deviceId })
             .eq('id', dbLicense.id);
         }
 
-        return { allowed: true, status: 'active', license: dbLicense, deviceId };
+        return {
+          allowed: true,
+          status: 'active',
+          licenseKey: cleanKey,
+          features: dbLicense.features || { allow_cloud_sync: true, max_screenshots: 999 },
+          license: dbLicense,
+          deviceId
+        };
       }
     }
 
-    return { allowed: true, status: 'active' };
+    // 3. No valid license key found -> Check 24-Hour Trial Status
+    const trial = getTrialStatus();
+    if (trial.active) {
+      return {
+        allowed: true,
+        status: 'trial_active',
+        hoursLeft: trial.hoursLeft,
+        trialUsed: true,
+        features: { allow_cloud_sync: false, max_screenshots: 1 },
+        message: `24-Hour Trial Active (${trial.hoursLeft}h remaining). Local offline features enabled.`
+      };
+    }
+
+    // Trial expired or not used -> Require License Key Activation
+    return {
+      allowed: false,
+      status: 'license_required',
+      trialUsed: trial.used,
+      trialExpired: trial.expired || false,
+      reason: trial.expired ? 'Trial Expired' : 'Activation Code Required',
+      message: trial.expired
+        ? 'Your 24-hour trial period has expired. Please enter an Activation Code to continue using Hammer Pro Journal.'
+        : 'Please enter your Activation Code / License Key to unlock Hammer Pro Journal.'
+    };
+
   } catch (err) {
-    console.warn('License verification check note:', err);
-    // Defensive fallback: if network is down or offline, allow cached access
-    return { allowed: true, status: 'cached_offline' };
+    console.warn('License verification note:', err);
+    // Offline / fallback check: check trial status
+    const trial = getTrialStatus();
+    if (storedKey || trial.active) {
+      return { allowed: true, status: 'offline_cached', features: { allow_cloud_sync: false, max_screenshots: 1 } };
+    }
+    return {
+      allowed: false,
+      status: 'license_required',
+      trialUsed: trial.used,
+      reason: 'Activation Code Required',
+      message: 'Please enter your Activation Code / License Key to unlock.'
+    };
   }
 }
 
@@ -141,7 +212,7 @@ export async function checkLicenseAndAccess(userProfile = null) {
  * Activate a License Key with Supabase
  */
 export async function activateLicenseKey(licenseKey, userProfile) {
-  if (!licenseKey) return { success: false, error: 'Please enter a license key.' };
+  if (!licenseKey) return { success: false, error: 'Please enter an activation key.' };
   const cleanKey = licenseKey.trim().toUpperCase();
   const deviceId = await getDeviceFingerprint();
 
@@ -153,24 +224,38 @@ export async function activateLicenseKey(licenseKey, userProfile) {
       .maybeSingle();
 
     if (error || !dbLicense) {
-      return { success: false, error: 'License key not found. Please verify and try again.' };
+      return { success: false, error: 'Activation code not found. Please verify and try again.' };
     }
 
     if (!dbLicense.is_active) {
-      return { success: false, error: 'This license key has been deactivated by the administrator.' };
+      return { success: false, error: 'This activation code has been deactivated by the administrator.' };
     }
 
     if (dbLicense.expires_at && new Date(dbLicense.expires_at) < new Date()) {
-      return { success: false, error: 'This license key has expired.' };
+      return { success: false, error: 'This activation code has expired.' };
     }
 
-    // Bind license to user & device
-    if (userProfile && userProfile.id) {
+    const maxDevs = dbLicense.max_devices || dbLicense.max_users || 1;
+    let boundDevices = Array.isArray(dbLicense.bound_devices) ? dbLicense.bound_devices : [];
+    if (dbLicense.device_fingerprint && !boundDevices.includes(dbLicense.device_fingerprint)) {
+      boundDevices.push(dbLicense.device_fingerprint);
+    }
+
+    if (!boundDevices.includes(deviceId) && boundDevices.length >= maxDevs) {
+      return { success: false, error: `This key has reached its maximum capacity of ${maxDevs} device(s).` };
+    }
+
+    if (!boundDevices.includes(deviceId)) {
+      boundDevices.push(deviceId);
       await supabase
         .from('licenses')
-        .update({ user_id: userProfile.id, device_fingerprint: deviceId })
+        .update({ bound_devices: boundDevices, device_fingerprint: deviceId, user_id: userProfile?.id || null })
         .eq('id', dbLicense.id);
+    }
 
+    localStorage.setItem(ACTIVATED_KEY_STORAGE, cleanKey);
+
+    if (userProfile && userProfile.id) {
       await supabase
         .from('user_profiles')
         .update({ license_key: cleanKey, is_blocked: false })

@@ -50,10 +50,17 @@ export function parseTime(timeStr, defaultDateStr = null, dateFormatSetting = 'D
             timePart = dateMatch[4] || '09:30:00';
 
             if (p1 > 1000) {
-                // ISO format: YYYY-MM-DD
+                // ISO format: YYYY-MM-DD or YYYY-DD-MM
                 year = p1;
-                month = Math.min(Math.max(p2, 1), 12);
-                day = Math.min(Math.max(p3, 1), 31);
+                if (p2 > 12 && p3 <= 12) {
+                    // Swapped YYYY-DD-MM (e.g. 2026-29-07)
+                    day = p2;
+                    month = p3;
+                } else {
+                    // Canonical YYYY-MM-DD
+                    month = Math.min(Math.max(p2, 1), 12);
+                    day = Math.min(Math.max(p3, 1), 31);
+                }
             } else {
                 // Two day/month tokens with trailing year p3
                 year = p3 < 100 ? 2000 + p3 : p3;
@@ -222,7 +229,7 @@ export function validateLogBatch(rawText, defaultDateStr = null, dateFormatSetti
     const executions = [];
     const anomalies = [];
     const symbols = new Set();
-    let detectedDate = defaultDateStr;
+    let detectedDate = null;
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
@@ -234,10 +241,28 @@ export function validateLogBatch(rawText, defaultDateStr = null, dateFormatSetti
                 executions.push(parsed);
                 symbols.add(parsed.symbol);
                 if (!detectedDate && parsed.dateObj) {
-                    const y = parsed.dateObj.getFullYear();
-                    const m = (parsed.dateObj.getMonth() + 1).toString().padStart(2, '0');
-                    const d = parsed.dateObj.getDate().toString().padStart(2, '0');
-                    detectedDate = `${y}-${m}-${d}`;
+                    try {
+                        const parts = new Intl.DateTimeFormat('en-US', {
+                            timeZone: 'America/New_York',
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit'
+                        }).formatToParts(parsed.dateObj);
+                        let y = '', m = '', d = '';
+                        for (const p of parts) {
+                            if (p.type === 'year') y = p.value;
+                            if (p.type === 'month') m = p.value;
+                            if (p.type === 'day') d = p.value;
+                        }
+                        if (y && m && d) {
+                            detectedDate = `${y}-${m}-${d}`;
+                        }
+                    } catch (e) {
+                        const y = parsed.dateObj.getFullYear();
+                        const m = (parsed.dateObj.getMonth() + 1).toString().padStart(2, '0');
+                        const d = parsed.dateObj.getDate().toString().padStart(2, '0');
+                        detectedDate = `${y}-${m}-${d}`;
+                    }
                 }
             } else if (line.match(/(Bought|Sold)/i)) {
                 anomalies.push({ lineIndex: i + 1, content: line });
@@ -245,6 +270,10 @@ export function validateLogBatch(rawText, defaultDateStr = null, dateFormatSetti
         } catch (e) {
             anomalies.push({ lineIndex: i + 1, content: line, error: e.message });
         }
+    }
+
+    if (!detectedDate) {
+        detectedDate = defaultDateStr;
     }
 
     let previewGrossPnl = 0;
@@ -259,7 +288,7 @@ export function validateLogBatch(rawText, defaultDateStr = null, dateFormatSetti
                 previewTrades = preview.totalOrders || 0;
             }
         }
-    } catch (e) {}
+    } catch (e) { }
 
     return {
         isValid: executions.length > 0,
@@ -401,7 +430,7 @@ export function matchTradesFIFOWithOpenPos(executions) {
 
 export function consolidateRoundTripTrades(matchedTrades) {
     if (!matchedTrades || matchedTrades.length === 0) return [];
-    
+
     const consolidated = [];
     let currentGroup = null;
 
@@ -655,6 +684,12 @@ export function compileSingleDayAnalytics(executions, feePerRoundTripShare = 0.0
         const sellRevenue = sells.reduce((a, b) => a + (b.execPrice * b.execQty), 0);
         const sellQty = sells.reduce((a, b) => a + b.execQty, 0);
 
+        const stockWins = stockTrades.filter(t => t.pnl > 0).length;
+        const stockLosses = stockTrades.filter(t => t.pnl < 0).length;
+        const stockWinRate = stockTrades.length > 0 ? (stockWins / stockTrades.length) * 100 : 0;
+        const stockGrossProfit = stockTrades.filter(t => t.pnl > 0).reduce((acc, t) => acc + t.pnl, 0);
+        const stockGrossLoss = stockTrades.filter(t => t.pnl < 0).reduce((acc, t) => acc + Math.abs(t.pnl), 0);
+
         return {
             symbol: stock.symbol,
             pnl: stockGrossPnl,
@@ -663,8 +698,14 @@ export function compileSingleDayAnalytics(executions, feePerRoundTripShare = 0.0
             fees: stockFees,
             centsPerShare: stockCentsPerShare,
             totalQty: Math.max(stock.boughtQty, stock.soldQty),
+            totalVolume: stock.boughtQty + stock.soldQty,
             roundTripShares: stockRoundTripShares,
             tradesCount: stockTrades.length,
+            wins: stockWins,
+            losses: stockLosses,
+            winRate: stockWinRate,
+            grossProfit: stockGrossProfit,
+            grossLoss: stockGrossLoss,
             avgHoldTime,
             avgBuyPrice: buyQty > 0 ? buyCost / buyQty : 0,
             avgSellPrice: sellQty > 0 ? sellRevenue / sellQty : 0,
@@ -1226,7 +1267,7 @@ export async function fetchStockMarketData(symbol) {
     if (!symbol) return null;
     const sym = symbol.toUpperCase().trim();
     const cacheKey = `finviz_meta_v3_${sym}`;
-    
+
     try {
         const cached = localStorage.getItem(cacheKey);
         if (cached) {
@@ -1257,7 +1298,7 @@ export async function fetchStockMarketData(symbol) {
     try {
         const targetUrl = `https://finviz.com/stock?t=${sym}`;
         const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-        
+
         let htmlText = '';
         try {
             const res = await fetch(proxyUrl);
@@ -1284,11 +1325,11 @@ export async function fetchStockMarketData(symbol) {
             }
 
             const mComp = htmlText.match(/class="quote-header_ticker-wrapper_company[^"]*"[^>]*>\s*<a[^>]*>(.*?)<\/a>/i) ||
-                          htmlText.match(/<title>(.*?)<\/title>/i);
+                htmlText.match(/<title>(.*?)<\/title>/i);
             let compName = mComp ? cleanHtmlText(mComp[1]) : `${sym} Corp`;
 
             const mPrice = htmlText.match(/class="quote-price_price"[^"]*>\s*<strong[^>]*>(.*?)<\/strong>/i) ||
-                           htmlText.match(/class="quote-price_price"[^>]*>(.*?)<\/strong>/i);
+                htmlText.match(/class="quote-price_price"[^>]*>(.*?)<\/strong>/i);
             const mChange = htmlText.match(/class="quote-price_change[^"]*"[^>]*>(.*?)<\/span>/i);
 
             let cleanPrice = mPrice ? cleanHtmlText(mPrice[1]) : kv["Price"] || kv["Prev Close"] || "0.00";
