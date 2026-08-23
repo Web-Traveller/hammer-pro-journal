@@ -100,11 +100,12 @@ jobs:
           RAW_APK=$(find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" | head -n 1)
           echo "Found RAW APK: $RAW_APK"
           if [ -n "$RAW_APK" ]; then
+            APP_VER=$(node -p "require('./package.json').version")
             keytool -genkey -v -keystore release.keystore -alias hammerpro -keyalg RSA -keysize 2048 -validity 10000 -storepass hammerpro123 -keypass hammerpro123 -dname "CN=HammerPro, OU=Trading, O=HammerPro, L=US, S=NY, C=US"
             $ANDROID_HOME/build-tools/34.0.0/zipalign -v -p 4 "$RAW_APK" ./aligned.apk
-            $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks release.keystore --ks-pass pass:hammerpro123 --ks-key-alias hammerpro --key-pass pass:hammerpro123 --out ./HammerPro-Journal-v2.0.0-Android.apk ./aligned.apk
-            $ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose ./HammerPro-Journal-v2.0.0-Android.apk
-            echo "apk_path=./HammerPro-Journal-v2.0.0-Android.apk" >> $GITHUB_OUTPUT
+            $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks release.keystore --ks-pass pass:hammerpro123 --ks-key-alias hammerpro --key-pass pass:hammerpro123 --out ./HammerPro-Journal-v${APP_VER}-Android.apk ./aligned.apk
+            $ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose ./HammerPro-Journal-v${APP_VER}-Android.apk
+            echo "apk_path=./HammerPro-Journal-v${APP_VER}-Android.apk" >> $GITHUB_OUTPUT
           fi
 
       - name: Upload Signed APK to GitHub Release

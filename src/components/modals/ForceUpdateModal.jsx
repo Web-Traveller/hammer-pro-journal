@@ -121,11 +121,11 @@ export function ForceUpdateModal({ versionStatus }) {
           }}
         >
           <Download size={18} />
-          <span>Download Update Now</span>
+          <span>{versionStatus.isMobile ? 'Download Android APK' : 'Download Windows Update'}</span>
         </a>
 
         <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-          Need help? Contact the developer for assistance.
+          {versionStatus.isMobile ? 'Tap above to download and install the latest APK.' : 'Need help? Contact the developer for assistance.'}
         </div>
       </div>
     </div>

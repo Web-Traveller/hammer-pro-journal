@@ -5,7 +5,7 @@
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVScGh6OStMM2FBUWRzM0thK1piZGJiMWo2eDFkbThVM0M2Z3k1RDl3aFBXelBFS3Y2YnNzdmpxQkxna3FUSHhXZkhSclNzSE1neEpQUmw0TUg3YkFPMDhIalo0Q0svMmdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg3MTg5MTEzCWZpbGU6SGFtbWVyIFBybyBKb3VybmFsXzIuMC4xX3g2NC1zZXR1cC5leGUKNDB4MGhuOTM0anh1SVZJYlJDckx2WWlUemxYQnNWcGtNa1B5Y2hMS3VYZmhsaENzZ1Q4MnJPMVhpUVBpWWEzZlR5VHRMUHFENnRXS0I1VEFqR3NFRFE9PQo=",
-      "url": "https://qvzttflsjcgndjusvykq.supabase.co/storage/v1/object/public/releases/Hammer%20Pro%20Journal_2.0.1_x64-setup.exe"
+      "url": "https://github.com/Web-Traveller/hammer-pro-journal/releases/download/v2.0.1/Hammer.Pro.Journal_2.0.1_x64-setup.exe"
     }
   }
 }

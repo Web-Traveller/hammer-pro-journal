@@ -32,6 +32,11 @@ export function compareSemver(v1, v2) {
  */
 export async function checkAppVersionStatus() {
   try {
+    const isMobile = typeof window !== 'undefined' && (
+      /android|iphone|ipad|ipod/i.test(navigator.userAgent || '') || 
+      window.innerWidth <= 768
+    );
+
     const { data: row } = await supabase
       .from('app_config')
       .select('value')
@@ -45,16 +50,27 @@ export async function checkAppVersionStatus() {
       download_url: 'https://github.com/Web-Traveller/hammer-pro-journal/releases'
     };
 
-    const latestVersion = config.latest_version || CURRENT_APP_VERSION;
-    const minVersion = config.min_version || CURRENT_APP_VERSION;
+    // Platform-Aware Version & Download Routing
+    const latestVersion = isMobile
+      ? (config.latest_version_mobile || config.mobile?.latest_version || '2.0.0')
+      : (config.latest_version_desktop || config.desktop?.latest_version || config.latest_version || CURRENT_APP_VERSION);
+
+    const minVersion = isMobile
+      ? (config.min_version_mobile || config.mobile?.min_version || config.min_version || '2.0.0')
+      : (config.min_version_desktop || config.desktop?.min_version || config.min_version || CURRENT_APP_VERSION);
+
     const graceDays = config.grace_period_days || 7;
-    const downloadUrl = config.download_url || 'https://github.com/Web-Traveller/hammer-pro-journal/releases';
+
+    const downloadUrl = isMobile
+      ? (config.download_url_android || config.mobile?.download_url || config.download_url || 'https://github.com/Web-Traveller/hammer-pro-journal/releases/latest')
+      : (config.download_url_desktop || config.desktop?.download_url || config.download_url || 'https://github.com/Web-Traveller/hammer-pro-journal/releases/latest');
 
     // 1. If current version is below the absolute MINIMUM required version -> Instant Force Lock
     if (compareSemver(CURRENT_APP_VERSION, minVersion) < 0) {
       return {
         isOutdated: true,
         forceUpdate: true,
+        isMobile,
         reason: 'min_version_breached',
         currentVersion: CURRENT_APP_VERSION,
         latestVersion,
