@@ -28,18 +28,45 @@ export function isDarkpool(route) {
 export function parseTime(timeStr, defaultDateStr = null, dateFormatSetting = 'DD-MM-YY') {
     try {
         if (!timeStr) {
-            return defaultDateStr ? createUSMarketDate(defaultDateStr, '09:30:00') : new Date();
+            const fallbackDateStr = defaultDateStr || new Date().toISOString().split('T')[0];
+            return {
+                dateObj: createUSMarketDate(fallbackDateStr, '09:30:00'),
+                hasExplicitDate: false,
+                formattedDateStr: fallbackDateStr,
+                formattedTimeStr: '09:30:00'
+            };
         }
         const str = timeStr.trim();
 
         // Default fallback date components
-        let fallback = defaultDateStr ? new Date(defaultDateStr) : new Date();
-        if (isNaN(fallback.getTime())) fallback = new Date();
+        let year = new Date().getFullYear();
+        let month = new Date().getMonth() + 1;
+        let day = new Date().getDate();
 
-        let year = fallback.getFullYear();
-        let month = fallback.getMonth() + 1; // 1-based
-        let day = fallback.getDate();
+        if (defaultDateStr && typeof defaultDateStr === 'string') {
+            const cleanDef = defaultDateStr.trim().split('T')[0];
+            const mIso = cleanDef.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+            if (mIso) {
+                year = parseInt(mIso[1], 10);
+                month = parseInt(mIso[2], 10);
+                day = parseInt(mIso[3], 10);
+            } else {
+                const mDmy = cleanDef.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/);
+                if (mDmy) {
+                    let p1 = parseInt(mDmy[1], 10);
+                    let p2 = parseInt(mDmy[2], 10);
+                    let p3 = parseInt(mDmy[3], 10);
+                    if (p3 < 100) p3 = 2000 + p3;
+                    year = p3;
+                    if (p1 > 12 && p2 <= 12) { day = p1; month = p2; }
+                    else if (p2 > 12 && p1 <= 12) { day = p2; month = p1; }
+                    else { day = p1; month = p2; }
+                }
+            }
+        }
+
         let timePart = str;
+        let hasExplicitDate = false;
 
         // Check if timestamp contains a full date: e.g. 27-07-2026 09:34:12, 07/27/26 09:34:12, 2026-07-27 09:34:12
         const dateMatch = str.match(/^(\d{1,4})[/.\-](\d{1,2})[/.\-](\d{1,4})\s*(.*)$/);
@@ -48,39 +75,31 @@ export function parseTime(timeStr, defaultDateStr = null, dateFormatSetting = 'D
             let p2 = parseInt(dateMatch[2], 10);
             let p3 = parseInt(dateMatch[3], 10);
             timePart = dateMatch[4] || '09:30:00';
+            hasExplicitDate = true;
 
             if (p1 > 1000) {
                 // ISO format: YYYY-MM-DD or YYYY-DD-MM
                 year = p1;
                 if (p2 > 12 && p3 <= 12) {
-                    // Swapped YYYY-DD-MM (e.g. 2026-29-07)
                     day = p2;
                     month = p3;
                 } else {
-                    // Canonical YYYY-MM-DD
                     month = Math.min(Math.max(p2, 1), 12);
                     day = Math.min(Math.max(p3, 1), 31);
                 }
             } else {
-                // Two day/month tokens with trailing year p3
                 year = p3 < 100 ? 2000 + p3 : p3;
-
-                // Defensive Mathematical Check:
                 if (p1 > 12 && p2 <= 12) {
-                    // p1 is definitely Day, p2 is Month (e.g. 27-07-2026)
                     day = p1;
                     month = p2;
                 } else if (p2 > 12 && p1 <= 12) {
-                    // p2 is definitely Day, p1 is Month (e.g. 07-27-2026)
                     day = p2;
                     month = p1;
                 } else {
-                    // Ambiguous (both <= 12), use user setting
                     if (dateFormatSetting === 'MM/DD/YY' || dateFormatSetting === 'US') {
                         month = p1;
                         day = p2;
                     } else {
-                        // Default DD-MM-YY (International / Day first)
                         day = p1;
                         month = p2;
                     }
@@ -88,11 +107,9 @@ export function parseTime(timeStr, defaultDateStr = null, dateFormatSetting = 'D
             }
         }
 
-        // Clamp month & day to valid bounds
         month = Math.min(Math.max(month || 1, 1), 12);
         day = Math.min(Math.max(day || 1, 1), 31);
 
-        // Parse time part: HH:MM:SS or HH:MM:SS AM/PM or HH:MM
         const timeMatch = timePart.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?/i);
         let hour = 9, minute = 30, second = 0;
 
@@ -110,10 +127,22 @@ export function parseTime(timeStr, defaultDateStr = null, dateFormatSetting = 'D
         const formattedDateStr = `${year}-${pad(month)}-${pad(day)}`;
         const formattedTimeStr = `${pad(hour)}:${pad(minute)}:${pad(second)}`;
 
-        return createUSMarketDate(formattedDateStr, formattedTimeStr);
+        const dateObj = createUSMarketDate(formattedDateStr, formattedTimeStr);
+        return {
+            dateObj,
+            hasExplicitDate,
+            formattedDateStr,
+            formattedTimeStr
+        };
     } catch (e) {
         console.error("Defensive parseTime recovery:", e);
-        return new Date();
+        const fallbackDateStr = defaultDateStr || new Date().toISOString().split('T')[0];
+        return {
+            dateObj: new Date(),
+            hasExplicitDate: false,
+            formattedDateStr: fallbackDateStr,
+            formattedTimeStr: '09:30:00'
+        };
     }
 }
 
@@ -159,14 +188,32 @@ export function parseLogLine(line, defaultDateStr = null, dateFormatSetting = 'D
         desc = cleanLine;
     }
 
-    // Match Execution pattern: "Sold AAPL 100 @ 150.25" or "Bought NVDA 10 @ 120.5"
-    const mExec = desc.match(/(Sold|Bought)\s+(\S+)\s+(\d+)\s+@\s+([\d\.]+)/i);
-    if (!mExec) return null;
+    // Match Execution pattern:
+    // Format 1: "Sold AAPL 100 @ 150.25" or "Bought NVDA 1,000 @ $120.5"
+    // Format 2: "Sold 100 AAPL @ 150.25" or "BOT 1000 NVDA @ 120.5"
+    let action = '';
+    let execSymbol = symbol || '';
+    let execQty = 0;
+    let execPrice = 0;
 
-    const action = mExec[1].charAt(0).toUpperCase() + mExec[1].slice(1).toLowerCase(); // "Bought" | "Sold"
-    const execSymbol = (symbol || mExec[2]).toUpperCase().trim();
-    const execQty = parseInt(mExec[3], 10);
-    const execPrice = parseFloat(mExec[4]);
+    const mExec1 = desc.match(/(Sold|Bought|SLD|BOT|BUY|SELL)\s+([A-Za-z0-9\.\^]+)\s+([\d,]+)\s+@\s+\$?([\d\.]+)/i);
+    const mExec2 = desc.match(/(Sold|Bought|SLD|BOT|BUY|SELL)\s+([\d,]+)\s+([A-Za-z0-9\.\^]+)\s+@\s+\$?([\d\.]+)/i);
+
+    if (mExec1 && isNaN(parseInt(mExec1[2], 10))) {
+        const rawAct = mExec1[1].toUpperCase();
+        action = (rawAct === 'BOUGHT' || rawAct === 'BOT' || rawAct === 'BUY') ? 'Bought' : 'Sold';
+        execSymbol = (symbol || mExec1[2]).toUpperCase().trim();
+        execQty = parseInt(mExec1[3].replace(/,/g, ''), 10);
+        execPrice = parseFloat(mExec1[4]);
+    } else if (mExec2) {
+        const rawAct = mExec2[1].toUpperCase();
+        action = (rawAct === 'BOUGHT' || rawAct === 'BOT' || rawAct === 'BUY') ? 'Bought' : 'Sold';
+        execSymbol = (symbol || mExec2[3]).toUpperCase().trim();
+        execQty = parseInt(mExec2[2].replace(/,/g, ''), 10);
+        execPrice = parseFloat(mExec2[4]);
+    } else {
+        return null;
+    }
 
     if (isNaN(execQty) || execQty <= 0 || isNaN(execPrice) || execPrice <= 0 || !execSymbol) {
         return null;
@@ -193,16 +240,21 @@ export function parseLogLine(line, defaultDateStr = null, dateFormatSetting = 'D
     }
 
     // Standardize timestamp date format
-    let parsedDateObj = parseTime(timestamp, defaultDateStr, dateFormatSetting);
-    const mDate = timestamp.match(/^(\d{1,4})[/.\-](\d{1,2})[/.\-](\d{1,4})/);
+    const parsedTime = parseTime(timestamp, defaultDateStr, dateFormatSetting);
+    const parsedDateObj = parsedTime.dateObj;
+    const hasExplicitDate = parsedTime.hasExplicitDate;
+    const extractedDateStr = hasExplicitDate ? parsedTime.formattedDateStr : null;
+
     let formattedTimestamp = timestamp;
-    if (!mDate && defaultDateStr) {
+    if (!hasExplicitDate && defaultDateStr) {
         formattedTimestamp = `${defaultDateStr} ${timestamp}`;
     }
 
     return {
         timestamp: formattedTimestamp,
         dateObj: parsedDateObj,
+        hasExplicitDate,
+        extractedDateStr,
         symbol: execSymbol,
         status: status || 'Filled',
         action,
@@ -221,15 +273,17 @@ export function parseLogLine(line, defaultDateStr = null, dateFormatSetting = 'D
  * Generates an instant sanity report before importing
  */
 export function validateLogBatch(rawText, defaultDateStr = null, dateFormatSetting = 'DD-MM-YY') {
-    if (!rawText || typeof rawText !== 'string') {
-        return { isValid: false, message: 'Log content is empty.', executions: [], detectedDate: null, symbols: [] };
+    if (!rawText || typeof rawText !== 'string' || !rawText.trim()) {
+        return { isValid: false, valid: false, message: 'Log content is empty.', executions: [], detectedDate: defaultDateStr || null, hasExplicitDate: false, symbols: [] };
     }
 
-    const lines = rawText.split('\n');
+    const cleanRaw = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const lines = cleanRaw.split('\n');
     const executions = [];
     const anomalies = [];
     const symbols = new Set();
     let detectedDate = null;
+    let hasExplicitDate = false;
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
@@ -240,31 +294,11 @@ export function validateLogBatch(rawText, defaultDateStr = null, dateFormatSetti
             if (parsed) {
                 executions.push(parsed);
                 symbols.add(parsed.symbol);
-                if (!detectedDate && parsed.dateObj) {
-                    try {
-                        const parts = new Intl.DateTimeFormat('en-US', {
-                            timeZone: 'America/New_York',
-                            year: 'numeric',
-                            month: '2-digit',
-                            day: '2-digit'
-                        }).formatToParts(parsed.dateObj);
-                        let y = '', m = '', d = '';
-                        for (const p of parts) {
-                            if (p.type === 'year') y = p.value;
-                            if (p.type === 'month') m = p.value;
-                            if (p.type === 'day') d = p.value;
-                        }
-                        if (y && m && d) {
-                            detectedDate = `${y}-${m}-${d}`;
-                        }
-                    } catch (e) {
-                        const y = parsed.dateObj.getFullYear();
-                        const m = (parsed.dateObj.getMonth() + 1).toString().padStart(2, '0');
-                        const d = parsed.dateObj.getDate().toString().padStart(2, '0');
-                        detectedDate = `${y}-${m}-${d}`;
-                    }
+                if (!hasExplicitDate && parsed.hasExplicitDate && parsed.extractedDateStr) {
+                    hasExplicitDate = true;
+                    detectedDate = parsed.extractedDateStr;
                 }
-            } else if (line.match(/(Bought|Sold)/i)) {
+            } else if (line.match(/(Bought|Sold|BOT|SLD|BUY|SELL)/i)) {
                 anomalies.push({ lineIndex: i + 1, content: line });
             }
         } catch (e) {
@@ -273,7 +307,7 @@ export function validateLogBatch(rawText, defaultDateStr = null, dateFormatSetti
     }
 
     if (!detectedDate) {
-        detectedDate = defaultDateStr;
+        detectedDate = defaultDateStr || null;
     }
 
     let previewGrossPnl = 0;
@@ -283,9 +317,9 @@ export function validateLogBatch(rawText, defaultDateStr = null, dateFormatSetti
         if (executions.length > 0) {
             const preview = compileSingleDayAnalytics(executions, 0.005, false, 'US_EASTERN');
             if (preview) {
-                previewGrossPnl = preview.grossPnl || preview.pnl || 0;
+                previewGrossPnl = preview.grossPnl !== undefined ? preview.grossPnl : (preview.pnl || 0);
                 previewShares = preview.roundTripShares || 0;
-                previewTrades = preview.totalOrders || 0;
+                previewTrades = preview.totalOrders || executions.length;
             }
         }
     } catch (e) { }
@@ -293,10 +327,12 @@ export function validateLogBatch(rawText, defaultDateStr = null, dateFormatSetti
     return {
         isValid: executions.length > 0,
         valid: executions.length > 0,
+        message: executions.length > 0 ? 'Valid execution fills found.' : 'No valid trade execution fills found in pasted text.',
         totalLines: lines.length,
         executionsCount: executions.length,
         executions,
         symbols: Array.from(symbols),
+        hasExplicitDate,
         detectedDate,
         anomalies,
         previewGrossPnl,
@@ -832,6 +868,82 @@ export function compileSingleDayAnalytics(executions, feePerRoundTripShare = 0.0
  */
 export function parseLogFile(rawText, feePerRoundTripShare = 0.05, enableFees = true, dateFormatSetting = 'DD-MM-YY', timezone = 'US_EASTERN') {
     if (!rawText || typeof rawText !== 'string') return null;
+    const trimmed = rawText.trim();
+
+    // Check if this is a structured Manual Summary Session
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        try {
+            const manual = JSON.parse(trimmed);
+            if (manual && (manual.isManualSummary || manual.type === 'manual_summary' || manual.netPnl !== undefined || manual.pnl !== undefined)) {
+                const netPnl = parseFloat(manual.netPnl ?? manual.pnl ?? 0) || 0;
+                const totalShares = parseInt(manual.totalShares ?? manual.roundTripShares ?? 0, 10) || 0;
+                const roundTripShares = parseInt(manual.roundTripShares ?? manual.totalShares ?? 0, 10) || totalShares;
+                const calculatedFees = enableFees ? roundTripShares * feePerRoundTripShare : 0;
+                const grossPnl = parseFloat(manual.grossPnl ?? (netPnl + calculatedFees)) || netPnl;
+                const totalOrders = parseInt(manual.totalOrders ?? manual.tradesCount ?? manual.totalTrades ?? 1, 10) || 1;
+                const tradesCount = parseInt(manual.tradesCount ?? manual.totalTrades ?? totalOrders, 10) || totalOrders;
+                const winTradesCount = parseInt(manual.winTradesCount ?? manual.winningTrades ?? 0, 10) || (netPnl > 0 ? tradesCount : 0);
+                const lossTradesCount = parseInt(manual.lossTradesCount ?? manual.losingTrades ?? 0, 10) || (netPnl < 0 ? tradesCount : 0);
+                const winRate = manual.winRate !== undefined ? parseFloat(manual.winRate) : (tradesCount > 0 ? (winTradesCount / tradesCount) * 100 : 0);
+                const longTrades = parseInt(manual.longTrades ?? 0, 10);
+                const shortTrades = parseInt(manual.shortTrades ?? 0, 10);
+                const symbols = Array.isArray(manual.symbols) ? manual.symbols : (manual.tickers ? String(manual.tickers).split(',').map(s => s.trim().toUpperCase()).filter(Boolean) : []);
+
+                const stockBreakdown = symbols.map(sym => ({
+                    symbol: sym,
+                    pnl: netPnl / (symbols.length || 1),
+                    netPnl: netPnl / (symbols.length || 1),
+                    totalQty: Math.round(totalShares / (symbols.length || 1)),
+                    tradesCount: Math.round(tradesCount / (symbols.length || 1)),
+                    matchedTrades: []
+                }));
+
+                return {
+                    isManualSummary: true,
+                    pnl: enableFees ? netPnl : grossPnl,
+                    grossPnl,
+                    netPnl,
+                    fees: calculatedFees,
+                    totalOrders,
+                    totalTrades: tradesCount,
+                    tradesCount,
+                    roundTripShares,
+                    totalShares,
+                    totalVolume: totalShares,
+                    winTradesCount,
+                    lossTradesCount,
+                    winningTrades: winTradesCount,
+                    losingTrades: lossTradesCount,
+                    winRate,
+                    profitFactor: manual.profitFactor || (grossPnl > 0 ? 99.99 : 0),
+                    avgHoldTime: manual.avgHoldTime || 0,
+                    netCentsPerShare: roundTripShares > 0 ? (netPnl / roundTripShares) * 100 : 0,
+                    avgCentsPerWinShare: roundTripShares > 0 ? (grossPnl / roundTripShares) * 100 : 0,
+                    avgCentsPerLossShare: 0,
+                    pnlPer1kShares: roundTripShares > 0 ? (netPnl / roundTripShares) * 1000 : 0,
+                    longStats: { count: longTrades, pnl: 0, volume: 0, winShares: 0, lossShares: 0 },
+                    shortStats: { count: shortTrades, pnl: 0, volume: 0, winShares: 0, lossShares: 0 },
+                    stockBreakdown,
+                    matchedTrades: [],
+                    allExecutions: [],
+                    ecnBreakdown: [],
+                    openPositionsSummary: [],
+                    hourlyStats: [],
+                    intradayPoints: [],
+                    bestTrades: [],
+                    worstTrades: [],
+                    holdTimeBuckets: {},
+                    stockTimeMatrix: { matrix: [], timeSlots: [], slotLabels: {}, goldenWindow: null, dangerWindow: null },
+                    dayDarkpoolVolume: 0,
+                    notes: manual.notes || manual.journalNote || '',
+                    symbols
+                };
+            }
+        } catch (e) {
+            // Not JSON, continue to raw execution logs
+        }
+    }
+
     const executions = extractExecutions(rawText, null, dateFormatSetting);
     if (!executions || executions.length === 0) return null;
     const analytics = compileSingleDayAnalytics(executions, feePerRoundTripShare, enableFees, timezone);
@@ -1263,21 +1375,23 @@ function cleanHtmlText(raw) {
     return clean;
 }
 
-export async function fetchStockMarketData(symbol) {
+export async function fetchStockMarketData(symbol, forceRefresh = false) {
     if (!symbol) return null;
     const sym = symbol.toUpperCase().trim();
     const cacheKey = `finviz_meta_v3_${sym}`;
 
-    try {
-        const cached = localStorage.getItem(cacheKey);
-        if (cached) {
-            const parsed = JSON.parse(cached);
-            if (Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
-                return parsed.data;
+    if (!forceRefresh) {
+        try {
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (parsed && parsed.data && parsed.data.price && parsed.data.price !== '0.00' && (Date.now() - parsed.timestamp < 12 * 60 * 60 * 1000)) {
+                    return parsed.data;
+                }
             }
+        } catch (e) {
+            console.warn("Cache read error:", e);
         }
-    } catch (e) {
-        console.warn("Cache read error:", e);
     }
 
     let metaData = {
@@ -1288,76 +1402,103 @@ export async function fetchStockMarketData(symbol) {
         country: 'USA',
         price: '0.00',
         change: '+0.00%',
-        metrics: {
-            "Prev Close": "0.00",
-            "Price": "0.00",
-            "Change %": "0.00%"
-        }
+        metrics: {}
     };
 
     try {
-        const targetUrl = `https://finviz.com/stock?t=${sym}`;
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+        const targetUrl = `https://finviz.com/quote.ashx?t=${sym}`;
+        const urlsToTry = [
+            `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
+            targetUrl
+        ];
 
         let htmlText = '';
-        try {
-            const res = await fetch(proxyUrl);
-            if (res.ok) {
-                htmlText = await res.text();
-            }
-        } catch (errProxy) {
-            const resDirect = await fetch(targetUrl, { mode: 'cors' });
-            if (resDirect.ok) {
-                htmlText = await resDirect.text();
+        for (const url of urlsToTry) {
+            try {
+                const res = await fetch(url);
+                if (res.ok) {
+                    const text = await res.text();
+                    if (text && (text.includes('snapshot-td') || text.includes('snapshot-table') || text.includes('quote-header'))) {
+                        htmlText = text;
+                        break;
+                    }
+                }
+            } catch (err) {
+                // Try next endpoint
             }
         }
 
         if (htmlText) {
             const kv = {};
-            const re = /<div[^>]*class="[^"]*snapshot-td-label[^"]*"[^>]*>(.*?)<\/div>\s*<\/td>\s*<td[^>]*class="[^"]*snapshot-td2[^"]*"[^>]*>\s*<div[^>]*class="[^"]*snapshot-td-content[^"]*"[^>]*>(?:<b>)?(.*?)(?:<\/b>)?<\/div>/gi;
+
+            // Pattern A: standard div snapshot classes
+            const reA = /<div[^>]*class="[^"]*snapshot-td-label[^"]*"[^>]*>(.*?)<\/div>\s*<\/td>\s*<td[^>]*class="[^"]*snapshot-td2[^"]*"[^>]*>\s*<div[^>]*class="[^"]*snapshot-td-content[^"]*"[^>]*>(?:<b>)?(.*?)(?:<\/b>)?<\/div>/gi;
             let m;
-            while ((m = re.exec(htmlText)) !== null) {
+            while ((m = reA.exec(htmlText)) !== null) {
                 const key = cleanHtmlText(m[1]);
                 const val = cleanHtmlText(m[2]);
-                if (key && val) {
-                    kv[key] = val;
+                if (key && val) kv[key] = val;
+            }
+
+            // Pattern B: table cells snapshot-td2-cp / snapshot-td2
+            if (Object.keys(kv).length === 0) {
+                const reB = /<td[^>]*class="[^"]*snapshot-td2-cp[^"]*"[^>]*>(.*?)<\/td>\s*<td[^>]*class="[^"]*snapshot-td2[^"]*"[^>]*>(?:<b>)?(.*?)(?:<\/b>)?<\/td>/gi;
+                while ((m = reB.exec(htmlText)) !== null) {
+                    const key = cleanHtmlText(m[1]);
+                    const val = cleanHtmlText(m[2]);
+                    if (key && val) kv[key] = val;
+                }
+            }
+
+            // Pattern C: general table snapshot row pairs
+            if (Object.keys(kv).length === 0) {
+                const reC = /<td[^>]*class="table-dark-row-cp"[^>]*>(.*?)<\/td>\s*<td[^>]*class="table-dark-row"[^>]*>(?:<b>)?(.*?)(?:<\/b>)?<\/td>/gi;
+                while ((m = reC.exec(htmlText)) !== null) {
+                    const key = cleanHtmlText(m[1]);
+                    const val = cleanHtmlText(m[2]);
+                    if (key && val) kv[key] = val;
                 }
             }
 
             const mComp = htmlText.match(/class="quote-header_ticker-wrapper_company[^"]*"[^>]*>\s*<a[^>]*>(.*?)<\/a>/i) ||
                 htmlText.match(/<title>(.*?)<\/title>/i);
             let compName = mComp ? cleanHtmlText(mComp[1]) : `${sym} Corp`;
+            if (compName.includes('Stock Quote')) {
+                compName = compName.replace(/Stock Quote.*/i, '').trim();
+            }
 
             const mPrice = htmlText.match(/class="quote-price_price"[^"]*>\s*<strong[^>]*>(.*?)<\/strong>/i) ||
                 htmlText.match(/class="quote-price_price"[^>]*>(.*?)<\/strong>/i);
             const mChange = htmlText.match(/class="quote-price_change[^"]*"[^>]*>(.*?)<\/span>/i);
 
             let cleanPrice = mPrice ? cleanHtmlText(mPrice[1]) : kv["Price"] || kv["Prev Close"] || "0.00";
-            let cleanChange = mChange ? cleanHtmlText(mChange[1]) : kv["Change %"] || "0.00%";
+            let cleanChange = mChange ? cleanHtmlText(mChange[1]) : kv["Change %"] || kv["Change"] || "0.00%";
 
-            if (Object.keys(kv).length > 0) {
+            if (Object.keys(kv).length > 0 || (cleanPrice && cleanPrice !== '0.00')) {
                 metaData = {
                     symbol: sym,
-                    companyName: compName,
+                    companyName: compName || `${sym} Inc.`,
                     price: cleanPrice,
                     change: cleanChange,
                     sector: kv["Sector"] || "Equities",
                     industry: kv["Industry"] || "Common Stock",
                     metrics: kv
                 };
+
+                // Only cache successful data
+                try {
+                    localStorage.setItem(cacheKey, JSON.stringify({
+                        timestamp: Date.now(),
+                        data: metaData
+                    }));
+                } catch (e) {
+                    console.warn("Cache write error:", e);
+                }
             }
         }
     } catch (e) {
-        console.log(`Using fallback for ${sym}:`, e);
-    }
-
-    try {
-        localStorage.setItem(cacheKey, JSON.stringify({
-            timestamp: Date.now(),
-            data: metaData
-        }));
-    } catch (e) {
-        console.warn("Cache write error:", e);
+        console.log(`Finviz fetch note for ${sym}:`, e);
     }
 
     return metaData;

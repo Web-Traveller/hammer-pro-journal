@@ -117,6 +117,8 @@ export function useTradingState() {
     enableJournal: false,
     enableFees: false,
     feePerShare: 0.005,
+    enableMonthlyPlatformFee: false,
+    monthlyPlatformFee: 150,
     silentUpdates: true,
     cloudProvider: 'supabase_cloud',
     supabaseUrl: '',
@@ -345,6 +347,31 @@ export function useTradingState() {
     return Array.from(yearsSet).sort().reverse();
   }, [dailyStatsMap]);
 
+function getMonthPlatformFee(monthStr, settings) {
+  if (!settings || !settings.enableMonthlyPlatformFee || !monthStr) return 0;
+  const defaultFee = Number(settings.monthlyPlatformFee !== undefined ? settings.monthlyPlatformFee : 120);
+
+  if (settings.platformFeeMonths && settings.platformFeeMonths[monthStr] !== undefined) {
+    const val = settings.platformFeeMonths[monthStr];
+    if (typeof val === 'boolean') {
+      return val ? defaultFee : 0;
+    }
+    if (typeof val === 'number') {
+      return val >= 0 ? val : 0;
+    }
+    if (typeof val === 'object' && val !== null) {
+      if (!val.enabled) return 0;
+      return Number(val.fee !== undefined ? val.fee : defaultFee);
+    }
+  }
+
+  if (settings.platformFeeStartMonth) {
+    return monthStr >= settings.platformFeeStartMonth ? defaultFee : 0;
+  }
+
+  return defaultFee;
+}
+
   // Filtered Dashboard Analytics
   const filteredDashboardAnalytics = useMemo(() => {
     const validDates = Object.keys(dailyStatsMap).filter(d => {
@@ -366,13 +393,30 @@ export function useTradingState() {
     let tradesCountForHoldTime = 0;
     let totalWinShares = 0;
     let totalLossShares = 0;
+    let longTradesCount = 0;
+    let shortTradesCount = 0;
+    let longPnl = 0;
+    let shortPnl = 0;
 
+    // Track active and billed trading months for platform fee deduction
+    const activeMonthsSet = new Set();
+    const billedMonthsMap = new Map();
+    const monthsFirstSeen = new Set();
     const equityCurve = [];
     let runningCumulative = 0;
 
     validDates.forEach(dateStr => {
       const day = dailyStatsMap[dateStr];
       if (!day) return;
+      const monthKey = dateStr && dateStr.length >= 7 ? dateStr.substring(0, 7) : null;
+      if (monthKey) {
+        activeMonthsSet.add(monthKey);
+        if (!billedMonthsMap.has(monthKey)) {
+          const fee = getMonthPlatformFee(monthKey, settings);
+          if (fee > 0) billedMonthsMap.set(monthKey, fee);
+        }
+      }
+
       const pnlVal = settings.enableFees ? (day.netPnl ?? day.pnl) : (day.grossPnl ?? day.pnl);
       totalPnl += pnlVal || 0;
       grossPnl += (day.grossPnl ?? day.pnl) || 0;
@@ -387,6 +431,15 @@ export function useTradingState() {
       totalWinShares += day.winSharesTotal || 0;
       totalLossShares += day.lossSharesTotal || 0;
 
+      if (day.longStats) {
+        longTradesCount += day.longStats.count || 0;
+        longPnl += day.longStats.pnl || 0;
+      }
+      if (day.shortStats) {
+        shortTradesCount += day.shortStats.count || 0;
+        shortPnl += day.shortStats.pnl || 0;
+      }
+
       // Weighted hold time
       if (day.stockBreakdown) {
         day.stockBreakdown.forEach(s => {
@@ -399,13 +452,27 @@ export function useTradingState() {
         });
       }
 
-      runningCumulative += pnlVal;
+      let dayContribution = pnlVal;
+      if (settings.enableMonthlyPlatformFee && monthKey && !monthsFirstSeen.has(monthKey)) {
+        monthsFirstSeen.add(monthKey);
+        const feeToDeduct = getMonthPlatformFee(monthKey, settings);
+        dayContribution -= feeToDeduct;
+      }
+
+      runningCumulative += dayContribution;
       equityCurve.push({
         date: dateStr,
         dayPnl: pnlVal,
         cumulativePnl: runningCumulative
       });
     });
+
+    let totalPlatformFees = 0;
+    billedMonthsMap.forEach(fee => { totalPlatformFees += fee; });
+
+    const totalExecutionFees = settings.enableFees ? totalFees : 0;
+    const totalAllFees = totalExecutionFees + (settings.enableMonthlyPlatformFee ? totalPlatformFees : 0);
+    const finalNetPnl = grossPnl - totalAllFees;
 
     // Compute Peak-to-Trough Max Drawdown & Green/Red Days Streaks
     let maxDrawdown = 0;
@@ -444,19 +511,25 @@ export function useTradingState() {
     const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : (grossProfit > 0 ? 99.99 : 0);
     const avgHoldTime = tradesCountForHoldTime > 0 ? totalHoldTimeAcrossTrades / tradesCountForHoldTime : 0;
 
-    const netCentsPerShare = roundTripShares > 0 ? (totalPnl / roundTripShares) * 100 : 0;
+    const displayNetPnl = (settings.enableFees || settings.enableMonthlyPlatformFee) ? finalNetPnl : grossPnl;
+    const netCentsPerShare = roundTripShares > 0 ? (displayNetPnl / roundTripShares) * 100 : 0;
     const avgCentsPerWinShare = totalWinShares > 0
       ? (grossProfit / totalWinShares) * 100
       : (roundTripShares > 0 && winningTrades > 0 ? (grossProfit / (roundTripShares * (winningTrades / (totalTrades || 1)))) * 100 : 0);
     const avgCentsPerLossShare = totalLossShares > 0
       ? (grossLoss / totalLossShares) * 100
       : (roundTripShares > 0 && losingTrades > 0 ? (grossLoss / (roundTripShares * (losingTrades / (totalTrades || 1)))) * 100 : 0);
-    const pnlPer1kShares = roundTripShares > 0 ? (totalPnl / roundTripShares) * 1000 : 0;
+    const pnlPer1kShares = roundTripShares > 0 ? (displayNetPnl / roundTripShares) * 1000 : 0;
+    const totalDirTrades = longTradesCount + shortTradesCount;
 
     return {
-      totalPnl,
+      totalPnl: displayNetPnl,
       grossPnl,
-      totalFees,
+      totalFees: totalAllFees,
+      totalExecutionFees,
+      totalPlatformFees,
+      billedMonthsCount: billedMonthsMap.size,
+      activeMonthsCount: activeMonthsSet.size,
       totalTrades,
       winningTrades,
       losingTrades,
@@ -469,6 +542,12 @@ export function useTradingState() {
       avgCentsPerWinShare: isNaN(avgCentsPerWinShare) ? 0 : avgCentsPerWinShare,
       avgCentsPerLossShare: isNaN(avgCentsPerLossShare) ? 0 : avgCentsPerLossShare,
       pnlPer1kShares,
+      longTradesCount,
+      shortTradesCount,
+      longPnl,
+      shortPnl,
+      longRatio: totalDirTrades > 0 ? Math.round((longTradesCount / totalDirTrades) * 100) : 50,
+      shortRatio: totalDirTrades > 0 ? Math.round((shortTradesCount / totalDirTrades) * 100) : 50,
       maxDrawdown,
       greenDaysCount,
       redDaysCount,
@@ -476,7 +555,7 @@ export function useTradingState() {
       maxWinStreak,
       equityCurve
     };
-  }, [dailyStatsMap, dashboardMonthFilter, settings.enableFees]);
+  }, [dailyStatsMap, dashboardMonthFilter, settings.enableFees, settings.enableMonthlyPlatformFee, settings.monthlyPlatformFee, settings.platformFeeMonths, settings.platformFeeStartMonth]);
 
   // Overall Ticker & Hourly Stats
   const overallAnalytics = useMemo(() => {
@@ -593,6 +672,17 @@ export function useTradingState() {
       });
     }
   }, [selectedStockTicker]);
+
+  const handleRefreshStockMeta = (ticker) => {
+    const sym = ticker || selectedStockTicker;
+    if (sym) {
+      fetchStockMarketData(sym, true).then(data => {
+        if (data) setStockMarketMeta(data);
+      }).catch(err => {
+        console.warn("Finviz metadata refresh failed:", err);
+      });
+    }
+  };
 
   // Selected Stock Personal History
   const selectedStockPersonalHistory = useMemo(() => {
@@ -899,13 +989,55 @@ export function useTradingState() {
       showToast(report?.message || "No valid trade execution fills found in pasted text.", "error");
       return;
     }
+    if (!report.hasExplicitDate) {
+      report.detectedDate = selectedDate;
+    }
+    setPreImportReport(report);
+    setShowPreImportModal(true);
+  };
+
+  const handleTriggerManualPreImport = (manualData) => {
+    if (!manualData || !manualData.date) {
+      showToast("Please select a session date.", "error");
+      return;
+    }
+    const netPnlVal = parseFloat(manualData.netPnl || 0);
+    const grossPnlVal = manualData.grossPnl !== undefined && manualData.grossPnl !== '' ? parseFloat(manualData.grossPnl) : netPnlVal;
+    const totalSharesVal = parseInt(manualData.totalShares || 0, 10);
+    const totalTradesVal = parseInt(manualData.totalTrades || 1, 10);
+    const tickersArr = manualData.tickers ? manualData.tickers.split(',').map(s => s.trim().toUpperCase()).filter(Boolean) : [];
+
+    const report = {
+      isManualSummary: true,
+      isValid: true,
+      valid: true,
+      detectedDate: manualData.date.trim(),
+      hasExplicitDate: true,
+      previewGrossPnl: grossPnlVal,
+      netPnl: netPnlVal,
+      previewShares: totalSharesVal,
+      totalShares: totalSharesVal,
+      roundTripShares: totalSharesVal,
+      executionsCount: totalTradesVal,
+      totalOrders: totalTradesVal,
+      totalTrades: totalTradesVal,
+      symbols: tickersArr,
+      manualPayload: manualData
+    };
+
     setPreImportReport(report);
     setShowPreImportModal(true);
   };
 
   const handleConfirmImport = async () => {
     if (!preImportReport) return;
-    const dateToUse = preImportReport.detectedDate || selectedDate;
+    if (preImportReport.isManualSummary && preImportReport.manualPayload) {
+      await handleSaveManualSession(preImportReport.manualPayload);
+      setShowPreImportModal(false);
+      setPreImportReport(null);
+      return;
+    }
+    const dateToUse = (preImportReport.hasExplicitDate ? preImportReport.detectedDate : selectedDate) || preImportReport.detectedDate || selectedDate;
     try {
       await saveLogToStorage(dateToUse, pastedText);
       if (pendingScreenshots.length > 0) {
@@ -929,6 +1061,53 @@ export function useTradingState() {
     }
   };
 
+  const handleSaveManualSession = async (manualData) => {
+    if (!manualData || !manualData.date) {
+      showToast("Please select a session date.", "error");
+      return;
+    }
+    const sessionDateStr = manualData.date.trim();
+    const payload = JSON.stringify({
+      isManualSummary: true,
+      type: 'manual_summary',
+      date: sessionDateStr,
+      netPnl: parseFloat(manualData.netPnl || 0),
+      grossPnl: manualData.grossPnl !== undefined && manualData.grossPnl !== '' ? parseFloat(manualData.grossPnl) : parseFloat(manualData.netPnl || 0),
+      totalShares: parseInt(manualData.totalShares || manualData.roundTripShares || 0, 10),
+      roundTripShares: parseInt(manualData.roundTripShares || manualData.totalShares || 0, 10),
+      totalOrders: parseInt(manualData.totalOrders || manualData.totalTrades || 1, 10),
+      tradesCount: parseInt(manualData.tradesCount || manualData.totalTrades || 1, 10),
+      winTradesCount: parseInt(manualData.winTradesCount || 0, 10),
+      lossTradesCount: parseInt(manualData.lossTradesCount || 0, 10),
+      longTrades: parseInt(manualData.longTrades || 0, 10),
+      shortTrades: parseInt(manualData.shortTrades || 0, 10),
+      tickers: manualData.tickers || '',
+      symbols: manualData.tickers ? manualData.tickers.split(',').map(s => s.trim().toUpperCase()).filter(Boolean) : [],
+      notes: manualData.notes || '',
+      savedAt: new Date().toISOString()
+    }, null, 2);
+
+    try {
+      await saveLogToStorage(sessionDateStr, payload);
+      if (pendingScreenshots.length > 0) {
+        await saveScreenshotsToStorage(sessionDateStr, pendingScreenshots);
+      }
+      if (manualData.notes) {
+        await saveJournalToStorage(sessionDateStr, manualData.notes);
+      }
+      const updatedLogs = { ...logs, [sessionDateStr]: payload };
+      setLogs(updatedLogs);
+      setSessionDate(sessionDateStr);
+      setPendingScreenshots([]);
+      setCurrentView('singleSession');
+      showToast(`Manual session summary saved for ${sessionDateStr}!`, "success");
+      executeTwoTierSync(dailyStatsMap, { explicitLogs: updatedLogs });
+    } catch (err) {
+      console.error("Error saving manual session:", err);
+      showToast("Failed to save manual session.", "error");
+    }
+  };
+
   const handlePasteChange = (eOrText) => {
     const text = (eOrText && eOrText.target && typeof eOrText.target.value === 'string')
       ? eOrText.target.value
@@ -936,8 +1115,9 @@ export function useTradingState() {
     const cleaned = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     setPastedText(cleaned);
     if (cleaned && cleaned.trim().length > 10) {
-      const report = validateLogBatch(cleaned, null, settings.dateFormat);
-      if (report && report.detectedDate) {
+      const report = validateLogBatch(cleaned, selectedDate, settings.dateFormat);
+      // ONLY change selectedDate if the log text actually contained an explicit date
+      if (report && report.hasExplicitDate && report.detectedDate) {
         setSelectedDate(report.detectedDate);
       }
     }
@@ -1142,8 +1322,11 @@ export function useTradingState() {
     handleInlineScreenshotSelect,
     handleDeleteSessionScreenshot,
     handleTriggerPreImport,
+    handleTriggerManualPreImport,
     handleConfirmImport,
+    handleSaveManualSession,
     handlePasteChange,
+    handleRefreshStockMeta,
     handleDeleteLog,
     deleteConfirmationDate,
     setDeleteConfirmationDate,

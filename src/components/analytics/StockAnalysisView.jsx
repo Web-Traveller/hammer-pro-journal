@@ -5,7 +5,8 @@ import {
   ExternalLink,
   ArrowUpRight,
   Percent,
-  Layers
+  Layers,
+  RotateCw
 } from 'lucide-react';
 
 export function StockAnalysisView({
@@ -17,6 +18,7 @@ export function StockAnalysisView({
   setSelectedStockTicker,
   tickerStats = [],
   stockMarketMeta,
+  onRefreshStockMeta,
   selectedStockPersonalHistory = { totalPnl: 0, netPnl: 0, winRate: 0, totalShares: 0, tradesCount: 0, sessions: [] },
   settings = {},
   onInspectSession
@@ -114,13 +116,24 @@ export function StockAnalysisView({
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   <div className="stock-terminal-price-box">
                     <div className="stock-terminal-price">${stockMarketMeta ? stockMarketMeta.price : '0.00'}</div>
                     <div className={`stock-terminal-change ${stockMarketMeta && stockMarketMeta.change?.includes('-') ? 'change-red' : 'change-green'}`}>
                       {stockMarketMeta ? stockMarketMeta.change : '0.00%'}
                     </div>
                   </div>
+
+                  {onRefreshStockMeta && (
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => onRefreshStockMeta(selectedStockTicker)}
+                      title="Reload Live Market Data"
+                      style={{ fontSize: '0.78rem', padding: '0.4rem 0.75rem', backgroundColor: 'rgba(255,255,255,0.1)', color: '#ffffff', border: '1px solid rgba(255,255,255,0.2)' }}
+                    >
+                      <RotateCw size={13} style={{ marginRight: '4px' }} /> Refresh
+                    </button>
+                  )}
 
                   <a 
                     href={`https://finviz.com/quote.ashx?t=${selectedStockTicker}`} 

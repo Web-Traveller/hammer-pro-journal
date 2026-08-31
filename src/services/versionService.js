@@ -96,6 +96,7 @@ export async function checkAppVersionStatus() {
         return {
           isOutdated: true,
           forceUpdate: true,
+          isMobile,
           reason: 'grace_period_expired',
           currentVersion: CURRENT_APP_VERSION,
           latestVersion,
@@ -108,6 +109,7 @@ export async function checkAppVersionStatus() {
       return {
         isOutdated: true,
         forceUpdate: false,
+        isMobile,
         daysRemaining,
         currentVersion: CURRENT_APP_VERSION,
         latestVersion,
@@ -118,11 +120,11 @@ export async function checkAppVersionStatus() {
 
     // App is up to date! Clear any outdated tracking timestamp
     localStorage.removeItem(OUTDATED_DETECTED_KEY);
-    return { isOutdated: false, forceUpdate: false, currentVersion: CURRENT_APP_VERSION };
+    return { isOutdated: false, forceUpdate: false, isMobile, currentVersion: CURRENT_APP_VERSION };
 
   } catch (e) {
     console.warn('Version check note:', e);
-    return { isOutdated: false, forceUpdate: false, currentVersion: CURRENT_APP_VERSION };
+    return { isOutdated: false, forceUpdate: false, isMobile: false, currentVersion: CURRENT_APP_VERSION };
   }
 }
 

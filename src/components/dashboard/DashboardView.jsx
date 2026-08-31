@@ -12,7 +12,8 @@ import {
   DollarSign,
   Layers,
   Award,
-  AlertTriangle
+  AlertTriangle,
+  TrendingUp
 } from 'lucide-react';
 
 export function DashboardView({
@@ -96,15 +97,21 @@ export function DashboardView({
         <div className="card card-hero">
           <div className="card-top">
             <span className="card-title">
-              {settings?.enableFees ? 'Accumulated Net P&L' : 'Accumulated Realized P&L'}
+              {(settings?.enableFees || settings?.enableMonthlyPlatformFee) ? 'Accumulated Net P&L' : 'Accumulated Realized P&L'}
             </span>
             <button className="card-icon-btn"><ArrowUpRight size={16} /></button>
           </div>
           <div className="card-value">
             {(filteredDashboardAnalytics.totalPnl || 0) >= 0 ? '+' : ''}${((filteredDashboardAnalytics.totalPnl || 0)).toFixed(2)}
           </div>
-          <span className="card-footer-tag tag-profit">
-            {settings?.enableFees ? `Gross: $${(filteredDashboardAnalytics.grossPnl || 0).toFixed(2)} • Fees: $${(filteredDashboardAnalytics.totalFees || 0).toFixed(2)}` : 'Realized Total Return'}
+          <span className="card-footer-tag tag-profit" style={{ fontSize: '0.74rem' }}>
+            {(settings?.enableFees || settings?.enableMonthlyPlatformFee) ? (
+              <span>
+                Gross: ${(filteredDashboardAnalytics.grossPnl || 0).toFixed(2)}
+                {settings?.enableFees && ` • Brokerage: -$${(filteredDashboardAnalytics.totalExecutionFees || 0).toFixed(2)}`}
+                {settings?.enableMonthlyPlatformFee && (filteredDashboardAnalytics.totalPlatformFees || 0) > 0 && ` • Platform (${filteredDashboardAnalytics.billedMonthsCount || 1}mo): -$${(filteredDashboardAnalytics.totalPlatformFees || 0).toFixed(2)}`}
+              </span>
+            ) : 'Realized Total Return'}
           </span>
         </div>
 
@@ -151,13 +158,21 @@ export function DashboardView({
       <div className="scalper-metrics-grid">
         <div className="scalper-card">
           <div className="scalper-card-title">
-            <span>Net Edge / Share</span>
-            <Zap size={14} color="var(--hero-green)" />
+            <span>Long vs Short Trades</span>
+            <TrendingUp size={14} color="var(--hero-green)" />
           </div>
-          <div className="scalper-card-val" style={{ color: (filteredDashboardAnalytics.netCentsPerShare || 0) >= 0 ? 'var(--hero-green)' : 'var(--rose-text)' }}>
-            {(filteredDashboardAnalytics.netCentsPerShare || 0) >= 0 ? '+' : ''}{(filteredDashboardAnalytics.netCentsPerShare || 0).toFixed(2)}¢
+          <div className="scalper-card-val" style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <span style={{ color: 'var(--hero-green)', fontWeight: 800 }}>
+              {filteredDashboardAnalytics.longTradesCount || 0} L
+            </span>
+            <span style={{ color: 'var(--text-light)' }}>/</span>
+            <span style={{ color: 'var(--rose-text)', fontWeight: 800 }}>
+              {filteredDashboardAnalytics.shortTradesCount || 0} S
+            </span>
           </div>
-          <div className="scalper-card-sub">All-time realized profit per share</div>
+          <div className="scalper-card-sub">
+            {filteredDashboardAnalytics.longRatio || 50}% Long • {filteredDashboardAnalytics.shortRatio || 50}% Short
+          </div>
         </div>
 
         <div className="scalper-card">

@@ -22,7 +22,8 @@ import {
   Award,
   AlertTriangle,
   Save,
-  Copy
+  Copy,
+  TrendingUp
 } from 'lucide-react';
 import { formatTimeLabel, isDarkpool } from '../../parser';
 import { formatDisplayDate } from '../../services/timeService';
@@ -394,13 +395,23 @@ export function SingleSessionView({
 
             <div className="scalper-card">
               <div className="scalper-card-title">
-                <span>PnL per 1k Shares</span>
-                <DollarSign size={14} color="#8b5cf6" />
+                <span>Long vs Short Trades</span>
+                <TrendingUp size={14} color="#8b5cf6" />
               </div>
-              <div className="scalper-card-val" style={{ color: (singleSessionAnalytics.pnlPer1kShares || 0) >= 0 ? 'var(--hero-green)' : 'var(--rose-text)' }}>
-                {(singleSessionAnalytics.pnlPer1kShares || 0) >= 0 ? '+' : ''}${(singleSessionAnalytics.pnlPer1kShares || 0).toFixed(2)}
+              <div className="scalper-card-val" style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ color: 'var(--hero-green)', fontWeight: 800 }}>
+                  {singleSessionAnalytics.longStats?.count || 0} L
+                </span>
+                <span style={{ color: 'var(--text-light)' }}>/</span>
+                <span style={{ color: 'var(--rose-text)', fontWeight: 800 }}>
+                  {singleSessionAnalytics.shortStats?.count || 0} S
+                </span>
               </div>
-              <div className="scalper-card-sub">Volume efficiency index</div>
+              <div className="scalper-card-sub">
+                {(singleSessionAnalytics.longStats?.count || 0) + (singleSessionAnalytics.shortStats?.count || 0) > 0
+                  ? `${Math.round(((singleSessionAnalytics.longStats?.count || 0) / (((singleSessionAnalytics.longStats?.count || 0) + (singleSessionAnalytics.shortStats?.count || 0)) || 1)) * 100)}% Long`
+                  : 'Directional Distribution'}
+              </div>
             </div>
 
             <div className="scalper-card">
@@ -626,110 +637,116 @@ export function SingleSessionView({
           )}
 
           {/* TAB 2: STOCK X TIME HEATMAP MATRIX */}
-          {sessionTab === 'timeMatrix' && singleSessionAnalytics.stockTimeMatrix && (
-            <div>
-              {/* Golden Window & Danger Window Row */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
-                {singleSessionAnalytics.stockTimeMatrix.goldenWindow ? (
-                  <div className="window-badge-golden">
-                    <Award size={28} />
-                    <div>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        Today's Golden Window (Peak Edge)
-                      </div>
-                      <div style={{ fontSize: '1.15rem', fontWeight: 800 }}>
-                        {singleSessionAnalytics.stockTimeMatrix.goldenWindow.slotLabel} — +${(singleSessionAnalytics.stockTimeMatrix.goldenWindow.pnl || 0).toFixed(2)}
-                      </div>
-                      <div style={{ fontSize: '0.72rem', opacity: 0.85 }}>
-                        {singleSessionAnalytics.stockTimeMatrix.goldenWindow.tradesCount || 0} trades • {singleSessionAnalytics.stockTimeMatrix.goldenWindow.volume || 0} shares
+          {sessionTab === 'timeMatrix' && (
+            singleSessionAnalytics.stockTimeMatrix && (singleSessionAnalytics.stockTimeMatrix.timeSlots || []).length > 0 ? (
+              <div>
+                {/* Golden Window & Danger Window Row */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+                  {singleSessionAnalytics.stockTimeMatrix.goldenWindow ? (
+                    <div className="window-badge-golden">
+                      <Award size={28} />
+                      <div>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Today's Golden Window (Peak Edge)
+                        </div>
+                        <div style={{ fontSize: '1.15rem', fontWeight: 800 }}>
+                          {singleSessionAnalytics.stockTimeMatrix.goldenWindow.slotLabel} — +${(singleSessionAnalytics.stockTimeMatrix.goldenWindow.pnl || 0).toFixed(2)}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', opacity: 0.85 }}>
+                          {singleSessionAnalytics.stockTimeMatrix.goldenWindow.tradesCount || 0} trades • {singleSessionAnalytics.stockTimeMatrix.goldenWindow.volume || 0} shares
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="window-badge-golden" style={{ opacity: 0.6 }}>
-                    <Award size={28} />
-                    <div>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 800 }}>No Golden Window Detected</div>
+                  ) : (
+                    <div className="window-badge-golden" style={{ opacity: 0.6 }}>
+                      <Award size={28} />
+                      <div>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 800 }}>No Golden Window Detected</div>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {singleSessionAnalytics.stockTimeMatrix.dangerWindow ? (
-                  <div className="window-badge-danger">
-                    <AlertTriangle size={28} />
-                    <div>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        Today's Danger Window (Chop / Loss Zone)
-                      </div>
-                      <div style={{ fontSize: '1.15rem', fontWeight: 800 }}>
-                        {singleSessionAnalytics.stockTimeMatrix.dangerWindow.slotLabel} — -${Math.abs(singleSessionAnalytics.stockTimeMatrix.dangerWindow.pnl || 0).toFixed(2)}
-                      </div>
-                      <div style={{ fontSize: '0.72rem', opacity: 0.85 }}>
-                        {singleSessionAnalytics.stockTimeMatrix.dangerWindow.tradesCount || 0} trades • Step away during this hour
+                  {singleSessionAnalytics.stockTimeMatrix.dangerWindow ? (
+                    <div className="window-badge-danger">
+                      <AlertTriangle size={28} />
+                      <div>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Today's Danger Window (Chop / Loss Zone)
+                        </div>
+                        <div style={{ fontSize: '1.15rem', fontWeight: 800 }}>
+                          {singleSessionAnalytics.stockTimeMatrix.dangerWindow.slotLabel} — -${Math.abs(singleSessionAnalytics.stockTimeMatrix.dangerWindow.pnl || 0).toFixed(2)}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', opacity: 0.85 }}>
+                          {singleSessionAnalytics.stockTimeMatrix.dangerWindow.tradesCount || 0} trades • Step away during this hour
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="window-badge-danger" style={{ opacity: 0.6 }}>
-                    <AlertTriangle size={28} />
-                    <div>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 800 }}>Zero Drawdown Windows</div>
+                  ) : (
+                    <div className="window-badge-danger" style={{ opacity: 0.6 }}>
+                      <AlertTriangle size={28} />
+                      <div>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 800 }}>Zero Drawdown Windows</div>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Matrix Grid Card */}
-              <div className="card">
-                <div className="card-top">
-                  <span className="card-title" style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 700 }}>
-                    Stock × Intraday Time Heatmap ({sessionDate})
-                  </span>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    Identifies which stock generated profit or loss during specific market time windows
-                  </span>
+                  )}
                 </div>
 
-                <div className="matrix-container">
-                  <table className="matrix-table">
-                    <thead>
-                      <tr>
-                        <th>Stock Ticker</th>
-                        {singleSessionAnalytics.stockTimeMatrix.timeSlots.map(slotKey => (
-                          <th key={slotKey}>
-                            {singleSessionAnalytics.stockTimeMatrix.slotLabels[slotKey] || slotKey}
-                          </th>
-                        ))}
-                        <th>Day Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {singleSessionAnalytics.stockTimeMatrix.matrix.map(row => (
-                        <tr key={row.symbol}>
-                          <td>{row.symbol}</td>
-                          {singleSessionAnalytics.stockTimeMatrix.timeSlots.map(slotKey => {
-                            const cell = row.slots[slotKey];
-                            if (!cell || cell.tradesCount === 0) {
-                              return <td key={slotKey} className="matrix-cell-empty">—</td>;
-                            }
-                            const isProfitable = (cell.pnl || 0) >= 0;
-                            return (
-                              <td key={slotKey} className={isProfitable ? 'matrix-cell-profit' : 'matrix-cell-loss'}>
-                                {isProfitable ? '+' : ''}${(cell.pnl || 0).toFixed(0)}
-                                <div style={{ fontSize: '0.65rem', opacity: 0.8 }}>{cell.tradesCount}tr</div>
-                              </td>
-                            );
-                          })}
-                          <td style={{ fontWeight: 800, color: (row.totalPnl || 0) >= 0 ? 'var(--hero-green)' : 'var(--rose-text)' }}>
-                            {(row.totalPnl || 0) >= 0 ? '+' : ''}${(row.totalPnl || 0).toFixed(2)}
-                          </td>
+                {/* Matrix Grid Card */}
+                <div className="card">
+                  <div className="card-top">
+                    <span className="card-title" style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 700 }}>
+                      Stock × Intraday Time Heatmap ({sessionDate})
+                    </span>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      Identifies which stock generated profit or loss during specific market time windows
+                    </span>
+                  </div>
+
+                  <div className="matrix-container">
+                    <table className="matrix-table">
+                      <thead>
+                        <tr>
+                          <th>Stock Ticker</th>
+                          {(singleSessionAnalytics.stockTimeMatrix.timeSlots || []).map(slotKey => (
+                            <th key={slotKey}>
+                              {singleSessionAnalytics.stockTimeMatrix.slotLabels?.[slotKey] || slotKey}
+                            </th>
+                          ))}
+                          <th>Day Total</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {(singleSessionAnalytics.stockTimeMatrix.matrix || []).map(row => (
+                          <tr key={row.symbol}>
+                            <td>{row.symbol}</td>
+                            {(singleSessionAnalytics.stockTimeMatrix.timeSlots || []).map(slotKey => {
+                              const cell = row.slots?.[slotKey];
+                              if (!cell || cell.tradesCount === 0) {
+                                return <td key={slotKey} className="matrix-cell-empty">—</td>;
+                              }
+                              const isProfitable = (cell.pnl || 0) >= 0;
+                              return (
+                                <td key={slotKey} className={isProfitable ? 'matrix-cell-profit' : 'matrix-cell-loss'}>
+                                  {isProfitable ? '+' : ''}${(cell.pnl || 0).toFixed(0)}
+                                  <div style={{ fontSize: '0.65rem', opacity: 0.8 }}>{cell.tradesCount}tr</div>
+                                </td>
+                              );
+                            })}
+                            <td style={{ fontWeight: 800, color: (row.totalPnl || 0) >= 0 ? 'var(--hero-green)' : 'var(--rose-text)' }}>
+                              {(row.totalPnl || 0) >= 0 ? '+' : ''}${(row.totalPnl || 0).toFixed(2)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="card" style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
+                <p style={{ margin: 0, fontSize: '0.9rem' }}>Intraday time matrix is available for sessions with timestamped raw execution logs.</p>
+              </div>
+            )
           )}
 
           {/* TAB 3: TAPE SCALPER & SPEED BREAKDOWN */}
@@ -854,18 +871,26 @@ export function SingleSessionView({
                     </tr>
                   </thead>
                   <tbody>
-                    {singleSessionAnalytics.ecnBreakdown.map((r) => (
-                      <tr key={r.route}>
-                        <td style={{ fontWeight: 800 }}>{r.route}</td>
-                        <td>
-                          <span className={`badge ${r.isDarkpool ? 'badge-darkpool' : 'badge-route'}`}>
-                            {r.isDarkpool ? 'Darkpool' : 'ECN'}
-                          </span>
+                    {(singleSessionAnalytics.ecnBreakdown || []).length > 0 ? (
+                      (singleSessionAnalytics.ecnBreakdown || []).map((r) => (
+                        <tr key={r.route}>
+                          <td style={{ fontWeight: 800 }}>{r.route}</td>
+                          <td>
+                            <span className={`badge ${r.isDarkpool ? 'badge-darkpool' : 'badge-route'}`}>
+                              {r.isDarkpool ? 'Darkpool' : 'ECN'}
+                            </span>
+                          </td>
+                          <td style={{ fontWeight: 700 }}>{r.volume} shares</td>
+                          <td>{r.fills} fills</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
+                          No specific ECN route execution fills recorded for this session.
                         </td>
-                        <td style={{ fontWeight: 700 }}>{r.volume} shares</td>
-                        <td>{r.fills} fills</td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>

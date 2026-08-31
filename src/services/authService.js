@@ -15,7 +15,9 @@ import {
   saveJournalToStorage,
   loadScreenshotsFromStorage,
   saveScreenshotsToStorage,
-  loadSettingsFromStorage
+  loadSettingsFromStorage,
+  getDeletedSessionsTombstones,
+  markSessionAsDeleted
 } from './storageService';
 import {
   uploadMasterSnapshot,
@@ -325,13 +327,21 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}) {
       // Merges any remote sessions uploaded from other devices (e.g. Office PC -> Laptop)
       // ==========================================
       let syncedNewLogs = false;
+      const tombstones = getDeletedSessionsTombstones();
       const updatedLocalLogs = { ...allLocalLogs };
+      
+      // Clean any tombstoned session from local logs
+      for (const delDate of Object.keys(tombstones)) {
+        delete updatedLocalLogs[delDate];
+      }
 
       // A. Pull Master Snapshot from Cloudflare R2
       try {
         const cloudSnapshot = await downloadMasterSnapshot(profile.id);
         if (cloudSnapshot && cloudSnapshot.sessions) {
           for (const sDate of Object.keys(cloudSnapshot.sessions)) {
+            if (tombstones[sDate]) continue; // Never re-pull deleted session
+
             const item = cloudSnapshot.sessions[sDate];
             if (item && item.journalNote) {
               await saveJournalToStorage(sDate, item.journalNote);
@@ -362,7 +372,7 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}) {
         if (Array.isArray(dbSessions)) {
           for (const session of dbSessions) {
             const sDate = session.session_date;
-            if (sDate && !updatedLocalLogs[sDate]) {
+            if (sDate && !tombstones[sDate] && !updatedLocalLogs[sDate]) {
               const rawLog = await downloadRawLogFromCloud(profile.id, sDate);
               if (rawLog) {
                 await persistLog(sDate, rawLog);
@@ -370,7 +380,7 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}) {
                 syncedNewLogs = true;
               }
             }
-            if (sDate && session.journal_note) {
+            if (sDate && !tombstones[sDate] && session.journal_note) {
               await saveJournalToStorage(sDate, session.journal_note);
             }
           }
@@ -511,7 +521,12 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}) {
  */
 export async function deleteSessionFromCloud(sessionDate) {
   const profile = getActiveUserProfile();
-  if (!profile || !sessionDate) return;
+  if (!sessionDate) return;
+
+  // Immediately record tombstone
+  markSessionAsDeleted(sessionDate);
+
+  if (!profile) return;
 
   try {
     // 1. Delete raw log from Cloudflare R2

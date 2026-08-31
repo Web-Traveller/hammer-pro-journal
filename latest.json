@@ -1,11 +1,11 @@
 {
-  "version": "2.0.1",
-  "notes": "Hammer Pro Journal v2.0.1: Silent Auto-Updates, Date Overwrite Bug Fix, 14-Day Revision Backups, Activation License Security, Cloudflare R2 Sync.",
-  "pub_date": "2026-08-20T00:00:00Z",
+  "version": "2.1.0",
+  "notes": "Hammer Pro Journal v2.1.0: Monthly Platform & Market Data Cost Engine, Per-Month Billing Matrix, Manual Session Review Modal, 14-Day Tombstone Soft-Deletes, Long vs Short Directional Metrics, and Session ECN Stability.",
+  "pub_date": "2026-08-31T07:30:00Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVScGh6OStMM2FBUWRzM0thK1piZGJiMWo2eDFkbThVM0M2Z3k1RDl3aFBXelBFS3Y2YnNzdmpxQkxna3FUSHhXZkhSclNzSE1neEpQUmw0TUg3YkFPMDhIalo0Q0svMmdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg3MTg5MTEzCWZpbGU6SGFtbWVyIFBybyBKb3VybmFsXzIuMC4xX3g2NC1zZXR1cC5leGUKNDB4MGhuOTM0anh1SVZJYlJDckx2WWlUemxYQnNWcGtNa1B5Y2hMS3VYZmhsaENzZ1Q4MnJPMVhpUVBpWWEzZlR5VHRMUHFENnRXS0I1VEFqR3NFRFE9PQo=",
-      "url": "https://github.com/Web-Traveller/hammer-pro-journal/releases/download/v2.0.1/Hammer.Pro.Journal_2.0.1_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVScGh6OStMM2FBUVcyVTc2cElnUXJxSUY2enp4RldHZnRXNWNnT3ZqUE52OVN1UU1oK3FuVUZiVi8xYStLOW5QSHZYT1pXaDFLK3JveVJUd0dVN1ZiTjVJSGFwMGpvSWdZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4MTYxNDAzCWZpbGU6SGFtbWVyIFBybyBKb3VybmFsXzIuMS4wX3g2NC1zZXR1cC5leGUKdEN4WmxMSFN2TFBCWGNkeGFCbWdsalNWUFpXd2hBRWpDMmRtY3VzSFpNOEgrcEtVSHg4dG1INHpxS0N4TzhadDlaN2xwZXFEb3QwMDlSVkUrWDJzQnc9PQo=",
+      "url": "https://github.com/Web-Traveller/hammer-pro-journal/releases/download/v2.1.0/Hammer.Pro.Journal_2.1.0_x64-setup.exe"
     }
   }
 }

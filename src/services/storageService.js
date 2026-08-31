@@ -75,6 +75,62 @@ export function cleanExpiredBackupRevisions(maxDays = 14) {
   }
 }
 
+const DELETED_SESSIONS_STORAGE_KEY = 'hammer_deleted_sessions_v1';
+
+export function getDeletedSessionsTombstones() {
+  try {
+    const raw = localStorage.getItem(DELETED_SESSIONS_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    const now = Date.now();
+    const active = {};
+    for (const [date, info] of Object.entries(parsed)) {
+      if (info && info.expiresAt && info.expiresAt > now) {
+        active[date] = info;
+      }
+    }
+    if (Object.keys(active).length !== Object.keys(parsed).length) {
+      localStorage.setItem(DELETED_SESSIONS_STORAGE_KEY, JSON.stringify(active));
+    }
+    return active;
+  } catch (e) {
+    return {};
+  }
+}
+
+export function markSessionAsDeleted(date, previousContent = null) {
+  if (!date) return;
+  const cleanDate = date.trim();
+  const now = Date.now();
+  const expiresAt = now + 14 * 24 * 60 * 60 * 1000; // 14 days retention
+
+  const tombstones = getDeletedSessionsTombstones();
+  tombstones[cleanDate] = {
+    deletedAt: now,
+    expiresAt,
+    archivedContent: previousContent || null
+  };
+
+  try {
+    localStorage.setItem(DELETED_SESSIONS_STORAGE_KEY, JSON.stringify(tombstones));
+    if (previousContent) {
+      localStorage.setItem(`trading_log_deleted_archived_${cleanDate}_${now}`, previousContent);
+    }
+  } catch (e) {
+    console.warn("Error marking session as deleted tombstone:", e);
+  }
+}
+
+export function unmarkSessionAsDeleted(date) {
+  if (!date) return;
+  const cleanDate = date.trim();
+  const tombstones = getDeletedSessionsTombstones();
+  if (tombstones[cleanDate]) {
+    delete tombstones[cleanDate];
+    localStorage.setItem(DELETED_SESSIONS_STORAGE_KEY, JSON.stringify(tombstones));
+  }
+}
+
 /**
  * Defensive Save Log - Writes to disk in Tauri and mirrors to localStorage
  */
@@ -84,6 +140,7 @@ export async function persistLog(date, content) {
   }
 
   const cleanDate = date.trim();
+  unmarkSessionAsDeleted(cleanDate);
   
   // If an existing log exists and is being edited, save a revision backup first
   try {
@@ -123,7 +180,7 @@ export async function retrieveAllLogs() {
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith("trading_log_")) {
+      if (key && key.startsWith("trading_log_") && !key.startsWith("trading_log_rev_") && !key.startsWith("trading_log_deleted_")) {
         const date = key.slice(12);
         if (!logs[date]) {
           logs[date] = localStorage.getItem(key);
@@ -132,6 +189,12 @@ export async function retrieveAllLogs() {
     }
   } catch (e) {
     console.error("LocalStorage read error:", e);
+  }
+
+  // Enforce 14-day deleted tombstones
+  const tombstones = getDeletedSessionsTombstones();
+  for (const deletedDate of Object.keys(tombstones)) {
+    delete logs[deletedDate];
   }
 
   return logs;
@@ -143,6 +206,9 @@ export async function retrieveAllLogs() {
 export async function removeLog(date) {
   if (!date) return;
   const cleanDate = date.trim();
+  const previousContent = localStorage.getItem(`trading_log_${cleanDate}`);
+  markSessionAsDeleted(cleanDate, previousContent);
+
   await safeTauriInvoke("delete_log", { date: cleanDate });
   await idbDeleteSessionScreenshots(cleanDate);
 

@@ -174,10 +174,30 @@ export function getTimeBucket(date, timezone = 'US_EASTERN') {
 export function createUSMarketDate(dateStr, timeStr) {
   try {
     if (!dateStr) return new Date();
-    const cleanDate = dateStr.trim();
+    const cleanDate = typeof dateStr === 'string' ? dateStr.trim() : String(dateStr);
     const cleanTime = (timeStr || '09:30:00').trim();
 
     const isoDate = cleanDate.includes('T') ? cleanDate.split('T')[0] : cleanDate;
+    let year = 2026, month = 1, day = 1;
+    const mIso = isoDate.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    if (mIso) {
+      year = parseInt(mIso[1], 10);
+      month = parseInt(mIso[2], 10);
+      day = parseInt(mIso[3], 10);
+    } else {
+      const mDmy = isoDate.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/);
+      if (mDmy) {
+        let p1 = parseInt(mDmy[1], 10);
+        let p2 = parseInt(mDmy[2], 10);
+        let p3 = parseInt(mDmy[3], 10);
+        if (p3 < 100) p3 = 2000 + p3;
+        year = p3;
+        if (p1 > 12 && p2 <= 12) { day = p1; month = p2; }
+        else if (p2 > 12 && p1 <= 12) { day = p2; month = p1; }
+        else { day = p1; month = p2; }
+      }
+    }
+
     const timeMatch = cleanTime.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?/i);
     let hour = 9, min = 30, sec = 0;
     if (timeMatch) {
@@ -190,16 +210,17 @@ export function createUSMarketDate(dateStr, timeStr) {
     }
 
     const pad = (n) => n.toString().padStart(2, '0');
-    // Determine accurate NY offset for this specific date
-    const testUtc = new Date(`${isoDate}T12:00:00Z`);
+    const formattedDate = `${year}-${pad(month)}-${pad(day)}`;
+    // Determine accurate NY offset for this specific date in UTC
+    const testUtc = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
     const isDst = isDaylightSavingTime(testUtc);
     const tzOffset = isDst ? '-04:00' : '-05:00';
 
-    const fullIso = `${isoDate}T${pad(hour)}:${pad(min)}:${pad(sec)}${tzOffset}`;
+    const fullIso = `${formattedDate}T${pad(hour)}:${pad(min)}:${pad(sec)}${tzOffset}`;
     const parsed = new Date(fullIso);
     if (!isNaN(parsed.getTime())) return parsed;
 
-    return new Date(`${isoDate} ${pad(hour)}:${pad(min)}:${pad(sec)}`);
+    return new Date(year, month - 1, day, hour, min, sec);
   } catch (e) {
     return new Date();
   }

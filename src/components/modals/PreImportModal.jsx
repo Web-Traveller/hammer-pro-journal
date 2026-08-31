@@ -12,14 +12,16 @@ export function PreImportModal({
   if (!isOpen || !report) return null;
 
   const displayDateStr = formatDisplayDate(report.detectedDate || selectedDate);
-  const pnl = report.previewGrossPnl || 0;
+  const pnl = report.netPnl !== undefined ? report.netPnl : (report.previewGrossPnl !== undefined ? report.previewGrossPnl : 0);
+  const sharesCount = report.previewShares || report.totalShares || report.roundTripShares || report.executionsCount || 0;
+  const tradesCount = report.totalTrades || report.totalOrders || report.executionsCount || 0;
 
   return (
     <div className="custom-modal-overlay" onClick={onClose}>
       <div className="custom-modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="custom-modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, fontSize: '1.05rem', color: 'var(--hero-green)' }}>
-            <Calendar size={20} /> Review &amp; Confirm Session Import
+            <Calendar size={20} /> {report.isManualSummary ? 'Review & Confirm Session Summary' : 'Review & Confirm Session Import'}
           </div>
           <button className="lightbox-close-btn" onClick={onClose}>
             <X size={16} />
@@ -36,9 +38,9 @@ export function PreImportModal({
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Est. Realized P&amp;L</div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Realized P&amp;L</div>
               <div style={{ fontSize: '1.25rem', fontWeight: 800, color: pnl >= 0 ? 'var(--hero-green)' : 'var(--rose-text)', marginTop: '0.2rem' }}>
-                {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
+                {pnl >= 0 ? '+' : ''}${Number(pnl).toFixed(2)}
               </div>
             </div>
           </div>
@@ -47,14 +49,14 @@ export function PreImportModal({
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1.25rem' }}>
             <div style={{ border: '1px solid var(--border-light)', borderRadius: '0.6rem', padding: '0.75rem', textAlign: 'center' }}>
               <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>Shares Traded</div>
-              <div style={{ fontSize: '1.15rem', fontWeight: 800, marginTop: '0.2rem' }}>{report.previewShares || report.executionsCount}</div>
+              <div style={{ fontSize: '1.15rem', fontWeight: 800, marginTop: '0.2rem' }}>{Number(sharesCount).toLocaleString()}</div>
             </div>
             <div style={{ border: '1px solid var(--border-light)', borderRadius: '0.6rem', padding: '0.75rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>Execution Fills</div>
-              <div style={{ fontSize: '1.15rem', fontWeight: 800, marginTop: '0.2rem' }}>{report.executionsCount}</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>{report.isManualSummary ? 'Total Trades' : 'Execution Fills'}</div>
+              <div style={{ fontSize: '1.15rem', fontWeight: 800, marginTop: '0.2rem' }}>{tradesCount}</div>
             </div>
             <div style={{ border: '1px solid var(--border-light)', borderRadius: '0.6rem', padding: '0.75rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>Unique Tickers</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>Tickers</div>
               <div style={{ fontSize: '1.15rem', fontWeight: 800, marginTop: '0.2rem' }}>{(report.symbols || []).length}</div>
             </div>
           </div>

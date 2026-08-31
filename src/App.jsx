@@ -252,6 +252,7 @@ export default function App() {
               selectedStockTicker={state.selectedStockTicker}
               setSelectedStockTicker={state.setSelectedStockTicker}
               stockMarketMeta={state.stockMarketMeta}
+              onRefreshStockMeta={state.handleRefreshStockMeta}
               customStockSearchInput={state.customStockSearchInput}
               setCustomStockSearchInput={state.setCustomStockSearchInput}
               selectedStockPersonalHistory={state.selectedStockPersonalHistory}
@@ -303,6 +304,8 @@ export default function App() {
               onFileSelect={state.handleFileSelect}
               onRemovePendingScreenshot={state.handleRemovePendingScreenshot}
               onTriggerPreImport={state.handleTriggerPreImport}
+              onTriggerManualPreImport={state.handleTriggerManualPreImport}
+              onSaveManualSession={state.handleSaveManualSession}
               logs={state.logs}
               onInspectSession={(date) => {
                 state.setSessionDate(date);
@@ -315,6 +318,7 @@ export default function App() {
           {state.currentView === 'settings' && (
             <SettingsView
               settings={state.settings}
+              availableMonths={state.availableMonths}
               onSaveSettings={state.handleSaveSettings}
               timezone={state.timezone}
               onTimezoneChange={state.handleTimezoneChange}
