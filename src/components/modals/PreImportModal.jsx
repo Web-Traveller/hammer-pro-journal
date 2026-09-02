@@ -12,7 +12,11 @@ export function PreImportModal({
   if (!isOpen || !report) return null;
 
   const displayDateStr = formatDisplayDate(report.detectedDate || selectedDate);
-  const pnl = report.netPnl !== undefined ? report.netPnl : (report.previewGrossPnl !== undefined ? report.previewGrossPnl : 0);
+  const grossPnl = report.grossPnl !== undefined
+    ? report.grossPnl
+    : (report.previewGrossPnl !== undefined
+      ? report.previewGrossPnl
+      : (report.pnl !== undefined ? report.pnl : 0));
   const sharesCount = report.previewShares || report.totalShares || report.roundTripShares || report.executionsCount || 0;
   const tradesCount = report.totalTrades || report.totalOrders || report.executionsCount || 0;
 
@@ -29,7 +33,7 @@ export function PreImportModal({
         </div>
 
         <div className="custom-modal-body">
-          {/* Highlighted Session Date */}
+          {/* Highlighted Session Date & Gross Realized P&L */}
           <div style={{ marginBottom: '1.25rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '0.75rem', padding: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontSize: '0.78rem', color: '#166534', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Session Date</div>
@@ -38,9 +42,9 @@ export function PreImportModal({
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Realized P&amp;L</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: pnl >= 0 ? 'var(--hero-green)' : 'var(--rose-text)', marginTop: '0.2rem' }}>
-                {pnl >= 0 ? '+' : ''}${Number(pnl).toFixed(2)}
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Gross Realized P&amp;L</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: grossPnl >= 0 ? 'var(--hero-green)' : 'var(--rose-text)', marginTop: '0.2rem' }}>
+                {grossPnl >= 0 ? '+' : ''}${Number(grossPnl).toFixed(2)}
               </div>
             </div>
           </div>

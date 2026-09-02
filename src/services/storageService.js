@@ -131,29 +131,46 @@ export function unmarkSessionAsDeleted(date) {
   }
 }
 
+export function getAccountLogKey(date, accountId = 'default') {
+  const cleanDate = (date || '').trim();
+  if (!accountId || accountId === 'default') {
+    return `trading_log_${cleanDate}`;
+  }
+  return `trading_log_${accountId}_${cleanDate}`;
+}
+
+export function getAccountJournalKey(date, accountId = 'default') {
+  const cleanDate = (date || '').trim();
+  if (!accountId || accountId === 'default') {
+    return `trading_journal_${cleanDate}`;
+  }
+  return `trading_journal_${accountId}_${cleanDate}`;
+}
+
 /**
- * Defensive Save Log - Writes to disk in Tauri and mirrors to localStorage
+ * Defensive Save Log - Writes to disk in Tauri and mirrors to localStorage with account namespacing
  */
-export async function persistLog(date, content) {
+export async function persistLog(date, content, accountId = 'default') {
   if (!date || typeof content !== 'string') {
     throw new Error("Invalid log data: date and content are required.");
   }
 
   const cleanDate = date.trim();
+  const logKey = getAccountLogKey(cleanDate, accountId);
   unmarkSessionAsDeleted(cleanDate);
   
   // If an existing log exists and is being edited, save a revision backup first
   try {
-    const existing = localStorage.getItem(`trading_log_${cleanDate}`);
+    const existing = localStorage.getItem(logKey);
     if (existing && existing !== content) {
       await saveLogRevisionBackup(cleanDate, existing);
     }
   } catch (e) {}
 
-  const tauriRes = await safeTauriInvoke("save_log", { date: cleanDate, content });
+  const tauriRes = await safeTauriInvoke("save_log", { date: cleanDate, content, accountId });
   
   try {
-    localStorage.setItem(`trading_log_${cleanDate}`, content);
+    localStorage.setItem(logKey, content);
   } catch (e) {
     console.warn("LocalStorage backup quota warning:", e);
   }
@@ -161,13 +178,13 @@ export async function persistLog(date, content) {
 }
 
 /**
- * Defensive Load All Logs
+ * Defensive Load All Logs for specific account
  */
-export async function retrieveAllLogs() {
+export async function retrieveAllLogs(accountId = 'default') {
   let logs = {};
   if (isTauriEnvironment()) {
     try {
-      const result = await safeTauriInvoke("load_all_logs");
+      const result = await safeTauriInvoke("load_all_logs", { accountId });
       if (result && typeof result === 'object' && Object.keys(result).length > 0) {
         logs = result;
       }
@@ -176,14 +193,30 @@ export async function retrieveAllLogs() {
     }
   }
 
-  // Fallback / merge with LocalStorage if empty or running in web sandbox
+  // Fallback / merge with LocalStorage by matching account prefix
   try {
+    const isDefault = !accountId || accountId === 'default';
+    const prefix = isDefault ? 'trading_log_' : `trading_log_${accountId}_`;
+
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith("trading_log_") && !key.startsWith("trading_log_rev_") && !key.startsWith("trading_log_deleted_")) {
-        const date = key.slice(12);
-        if (!logs[date]) {
-          logs[date] = localStorage.getItem(key);
+      if (!key) continue;
+
+      if (isDefault) {
+        // Main Account: starts with trading_log_ but NOT sub-accounts (trading_log_acc_), revisions or tombstones
+        if (key.startsWith('trading_log_') && !key.startsWith('trading_log_acc_') && !key.startsWith('trading_log_rev_') && !key.startsWith('trading_log_deleted_')) {
+          const date = key.slice(12);
+          if (date && !logs[date]) {
+            logs[date] = localStorage.getItem(key);
+          }
+        }
+      } else {
+        // Sub-Account (e.g. Premarket): starts with trading_log_acc_...
+        if (key.startsWith(prefix)) {
+          const date = key.slice(prefix.length);
+          if (date && !logs[date]) {
+            logs[date] = localStorage.getItem(key);
+          }
         }
       }
     }
@@ -203,21 +236,24 @@ export async function retrieveAllLogs() {
 /**
  * Defensive Delete Log
  */
-export async function removeLog(date) {
+export async function removeLog(date, accountId = 'default') {
   if (!date) return;
   const cleanDate = date.trim();
-  const previousContent = localStorage.getItem(`trading_log_${cleanDate}`);
+  const logKey = getAccountLogKey(cleanDate, accountId);
+  const journalKey = getAccountJournalKey(cleanDate, accountId);
+
+  const previousContent = localStorage.getItem(logKey);
   markSessionAsDeleted(cleanDate, previousContent);
 
-  await safeTauriInvoke("delete_log", { date: cleanDate });
+  await safeTauriInvoke("delete_log", { date: cleanDate, accountId });
   await idbDeleteSessionScreenshots(cleanDate);
 
   try {
-    localStorage.removeItem(`trading_log_${cleanDate}`);
-    localStorage.removeItem(`trading_journal_${cleanDate}`);
+    localStorage.removeItem(logKey);
+    localStorage.removeItem(journalKey);
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const key = localStorage.key(i);
-      if (key && key.startsWith(`trading_img_${cleanDate}_`)) {
+      if (key && (key.startsWith(`trading_img_${cleanDate}_`) || key.startsWith(`trading_img_${accountId}_${cleanDate}_`))) {
         localStorage.removeItem(key);
       }
     }
@@ -307,19 +343,21 @@ export async function deleteScreenshotFromStorage(date, filename) {
 /**
  * Journal Notes Persistence
  */
-export async function loadJournalFromStorage(date) {
+export async function loadJournalFromStorage(date, accountId = 'default') {
   if (!date) return '';
   try {
-    return localStorage.getItem(`trading_journal_${date.trim()}`) || '';
+    const key = getAccountJournalKey(date, accountId);
+    return localStorage.getItem(key) || '';
   } catch (e) {
     return '';
   }
 }
 
-export async function saveJournalToStorage(date, content) {
+export async function saveJournalToStorage(date, content, accountId = 'default') {
   if (!date) return;
   try {
-    localStorage.setItem(`trading_journal_${date.trim()}`, content || '');
+    const key = getAccountJournalKey(date, accountId);
+    localStorage.setItem(key, content || '');
   } catch (e) {
     console.error("Failed to save journal:", e);
   }

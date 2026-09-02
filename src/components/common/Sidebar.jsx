@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { APP_VERSION } from '../../version';
 
-export function Sidebar({ currentView, setCurrentView, userProfile, onOpenAuthModal }) {
+export function Sidebar({ currentView, setCurrentView, userProfile, onOpenAuthModal, hasUnsyncedChanges = false }) {
   return (
     <div className="sidebar" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div className="sidebar-logo">
@@ -37,7 +37,7 @@ export function Sidebar({ currentView, setCurrentView, userProfile, onOpenAuthMo
           </div>
           <div className={`nav-item ${currentView === 'ecnAnalytics' ? 'active' : ''}`} onClick={() => setCurrentView('ecnAnalytics')}>
             <Layers size={18} />
-            <span>ECN & Darkpools</span>
+            <span>ECN &amp; Darkpools</span>
           </div>
         </div>
 
@@ -79,23 +79,39 @@ export function Sidebar({ currentView, setCurrentView, userProfile, onOpenAuthMo
             cursor: 'pointer',
             backgroundColor: userProfile ? 'rgba(6, 78, 59, 0.04)' : '#f8fafc',
             border: '1px solid var(--border-light)',
-            transition: 'all 0.2s ease'
+            transition: 'all 0.2s ease',
+            position: 'relative'
           }}
           className="sidebar-profile-card"
+          title={userProfile ? `Signed in as ${userProfile.name} • Click to manage account & cloud sync` : "Click to sign in or enable cross-device cloud sync"}
         >
-          {userProfile ? (
+          {userProfile && userProfile.cloudProvider === 'supabase_cloud' ? (
             <>
-              <img
-                src={userProfile.avatarUrl}
-                alt={userProfile.name}
-                style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#fff', border: '1px solid var(--border-light)' }}
-              />
+              <div style={{ position: 'relative' }}>
+                <img
+                  src={userProfile.avatarUrl}
+                  alt={userProfile.name}
+                  style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#fff', border: '1px solid var(--border-light)' }}
+                />
+                <span
+                  style={{
+                    position: 'absolute',
+                    bottom: '-1px',
+                    right: '-1px',
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    backgroundColor: hasUnsyncedChanges ? '#f59e0b' : '#10b981',
+                    border: '1.5px solid #fff'
+                  }}
+                />
+              </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {userProfile.name}
                 </div>
-                <div style={{ fontSize: '0.68rem', color: 'var(--hero-green)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                  <Cloud size={10} /> {userProfile.planTier === 'pro' ? 'Pro Cloud Sync' : 'Free Sync'}
+                <div style={{ fontSize: '0.68rem', color: hasUnsyncedChanges ? '#d97706' : 'var(--hero-green)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  <Cloud size={10} /> {hasUnsyncedChanges ? 'Sync Pending' : (userProfile.planTier === 'pro' ? 'Pro Cloud Sync' : 'Free Sync')}
                 </div>
               </div>
             </>
@@ -105,8 +121,10 @@ export function Sidebar({ currentView, setCurrentView, userProfile, onOpenAuthMo
                 <User size={16} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)' }}>Guest Trader</div>
-                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Click to Sign In</div>
+                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                  {userProfile?.name ? userProfile.name : 'Guest Trader'}
+                </div>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Offline / Local Mode</div>
               </div>
             </>
           )}

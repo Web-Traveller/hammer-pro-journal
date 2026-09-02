@@ -5,6 +5,7 @@ import { MobileDashboardView } from './components/MobileDashboardView';
 import { MobilePulseView } from './components/MobilePulseView';
 import { MobileHeatmapView } from './components/MobileHeatmapView';
 import { MobileSettingsSheet } from './components/MobileSettingsSheet';
+import { AnnouncementBanner } from '../components/common/AnnouncementBanner';
 import {
   LayoutDashboard,
   BookOpen,
@@ -24,7 +25,9 @@ export function MobileApp({
   onOpenAuthModal,
   syncState,
   settings,
-  onSaveSettings
+  onSaveSettings,
+  activeBroadcast,
+  onDismissBroadcast
 }) {
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'session' | 'heatmap'
   const [showSettingsSheet, setShowSettingsSheet] = useState(false);
@@ -50,6 +53,12 @@ export function MobileApp({
         onOpenProfile={() => setShowSettingsSheet(true)}
         syncState={syncState}
         onSyncNow={handleSyncNow}
+      />
+
+      {/* Global Admin Broadcast Banner */}
+      <AnnouncementBanner
+        broadcast={activeBroadcast}
+        onDismiss={onDismissBroadcast}
       />
 
       {/* 1. OVERALL DASHBOARD VIEW */}

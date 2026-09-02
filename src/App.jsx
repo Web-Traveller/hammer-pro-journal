@@ -17,8 +17,10 @@ import { SettingsView } from './components/settings/SettingsView';
 import { PreImportModal } from './components/modals/PreImportModal';
 import { DeleteConfirmModal } from './components/modals/DeleteConfirmModal';
 import { AuthProfileModal } from './components/modals/AuthProfileModal';
+import { AccountsModal } from './components/modals/AccountsModal';
 import { ForceUpdateModal } from './components/modals/ForceUpdateModal';
 import { LicenseGateModal } from './components/modals/LicenseGateModal';
+import { AnnouncementBanner } from './components/common/AnnouncementBanner';
 import { MobileApp } from './mobile/MobileApp';
 import { MobileAuthScreen } from './mobile/components/MobileAuthScreen';
 
@@ -114,6 +116,8 @@ export default function App() {
           syncState={state.syncState}
           settings={state.settings}
           onSaveSettings={state.handleSaveSettings}
+          activeBroadcast={state.activeBroadcast}
+          onDismissBroadcast={state.handleDismissBroadcast}
         />
 
         {/* Global Auth Modal */}
@@ -122,6 +126,18 @@ export default function App() {
           onClose={() => state.setShowAuthModal(false)}
           onToast={state.showToast}
           dailyStatsMap={state.dailyStatsMap}
+        />
+
+        {/* Mobile Accounts Modal */}
+        <AccountsModal
+          isOpen={state.showAccountsModal}
+          onClose={() => state.setShowAccountsModal(false)}
+          accounts={state.accounts}
+          activeAccountId={state.activeAccountId}
+          onSwitchAccount={state.handleSwitchAccount}
+          onCreateAccount={state.handleCreateAccount}
+          onUpdateAccount={state.handleUpdateAccount}
+          onDeleteAccount={state.handleDeleteAccount}
         />
 
         {/* 7-Day Hard Expiry & Force Update Modal */}
@@ -169,10 +185,17 @@ export default function App() {
         setCurrentView={state.setCurrentView}
         userProfile={state.userProfile}
         onOpenAuthModal={() => state.setShowAuthModal(true)}
+        hasUnsyncedChanges={state.hasUnsyncedChanges}
       />
 
       {/* Main Content Area */}
       <div className="main-content">
+        {/* Global Admin Broadcast Announcement Banner */}
+        <AnnouncementBanner
+          broadcast={state.activeBroadcast}
+          onDismiss={state.handleDismissBroadcast}
+        />
+
         {/* Top Header */}
         <Header
           currentView={state.currentView}
@@ -185,6 +208,9 @@ export default function App() {
           userProfile={state.userProfile}
           onOpenAuthModal={() => state.setShowAuthModal(true)}
           syncState={state.syncState}
+          hasUnsyncedChanges={state.hasUnsyncedChanges}
+          activeAccount={state.activeAccount}
+          onOpenAccountsModal={() => state.setShowAccountsModal(true)}
         />
 
         {/* View Router Protected with Error Boundary */}
@@ -340,6 +366,18 @@ export default function App() {
           onClose={() => state.setShowAuthModal(false)}
           onToast={state.showToast}
           dailyStatsMap={state.dailyStatsMap}
+        />
+
+        {/* TRADING ACCOUNTS MODAL */}
+        <AccountsModal
+          isOpen={state.showAccountsModal}
+          onClose={() => state.setShowAccountsModal(false)}
+          accounts={state.accounts}
+          activeAccountId={state.activeAccountId}
+          onSwitchAccount={state.handleSwitchAccount}
+          onCreateAccount={state.handleCreateAccount}
+          onUpdateAccount={state.handleUpdateAccount}
+          onDeleteAccount={state.handleDeleteAccount}
         />
 
         {/* REVIEW & CONFIRM IMPORT MODAL */}

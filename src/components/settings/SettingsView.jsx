@@ -224,17 +224,27 @@ export function SettingsView({
         </div>
 
         <div className="form-group">
-          <label className="toggle-switch">
+          <label className="form-label">Top Best &amp; Worst Trades Shown in Journal</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', maxWidth: '320px' }}>
             <input
-              type="checkbox"
-              className="toggle-checkbox"
-              checked={settings.enableJournal}
-              onChange={(e) => onSaveSettings({ ...settings, enableJournal: e.target.checked })}
-              style={{ display: 'none' }}
+              type="number"
+              min="1"
+              max="10"
+              className="form-input"
+              value={settings.journalTopTradesCount !== undefined ? settings.journalTopTradesCount : 2}
+              onChange={(e) => {
+                let val = parseInt(e.target.value, 10);
+                if (isNaN(val)) val = 2;
+                val = Math.max(1, Math.min(10, val));
+                onSaveSettings({ ...settings, journalTopTradesCount: val, enableJournal: true });
+              }}
+              style={{ width: '90px' }}
             />
-            <span className="toggle-slider"></span>
-            <span className="form-label" style={{ marginBottom: 0 }}>Enable Session Journaling Tab</span>
-          </label>
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>trades per category (1 – 10, default 2)</span>
+          </div>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.35rem' }}>
+            Controls how many top winning trades and worst losing trades are highlighted in the Session Journal tab.
+          </span>
         </div>
       </div>
 

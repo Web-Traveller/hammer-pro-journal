@@ -318,7 +318,7 @@ export function ImportLogsView({
             </div>
 
             <form onSubmit={handleManualSubmit}>
-              {/* Row 1: Session Date & Net Realized P/L */}
+              {/* Row 1: Session Date & Gross Realized P/L */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.35rem', color: 'var(--text-main)' }}>
@@ -329,7 +329,7 @@ export function ImportLogsView({
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.35rem', color: 'var(--text-main)' }}>
-                    Net Realized P&amp;L ($) <span style={{ color: 'var(--rose-text)' }}>*</span>
+                    Gross Realized P&amp;L ($) <span style={{ color: 'var(--rose-text)' }}>*</span>
                   </label>
                   <div style={{ position: 'relative' }}>
                     <DollarSign size={14} style={{ position: 'absolute', left: '10px', top: '12px', color: 'var(--text-muted)' }} />
@@ -338,8 +338,8 @@ export function ImportLogsView({
                       step="any"
                       required
                       placeholder="e.g. 450.00 or -125.50"
-                      value={manualNetPnl}
-                      onChange={(e) => setManualNetPnl(e.target.value)}
+                      value={manualGrossPnl}
+                      onChange={(e) => setManualGrossPnl(e.target.value)}
                       className="form-input"
                       style={{ paddingLeft: '28px', fontWeight: 700 }}
                     />
@@ -347,7 +347,7 @@ export function ImportLogsView({
                 </div>
               </div>
 
-              {/* Row 2: Total Shares Traded & Gross P/L */}
+              {/* Row 2: Total Shares Traded & Net Realized P/L */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.35rem', color: 'var(--text-main)' }}>
@@ -369,14 +369,14 @@ export function ImportLogsView({
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, marginBottom: '0.35rem', color: 'var(--text-muted)' }}>
-                    Gross Realized P&amp;L ($) <span style={{ fontSize: '0.72rem' }}>(optional)</span>
+                    Net Realized P&amp;L ($) <span style={{ fontSize: '0.72rem' }}>(optional)</span>
                   </label>
                   <input
                     type="number"
                     step="any"
-                    placeholder="Defaults to Net P/L"
-                    value={manualGrossPnl}
-                    onChange={(e) => setManualGrossPnl(e.target.value)}
+                    placeholder="Defaults to Gross minus Fees"
+                    value={manualNetPnl}
+                    onChange={(e) => setManualNetPnl(e.target.value)}
                     className="form-input"
                   />
                 </div>

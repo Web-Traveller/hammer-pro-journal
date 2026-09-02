@@ -8,7 +8,9 @@ import {
   Lock,
   AlertCircle,
   CheckCircle,
-  ArrowLeft
+  ArrowLeft,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import {
   getActiveUserProfile,
@@ -27,7 +29,7 @@ export function AuthProfileModal({
   dailyStatsMap = {}
 }) {
   const [profile, setProfile] = useState(getActiveUserProfile());
-  const [activeTab, setActiveTab] = useState(profile ? 'profile' : 'signin'); // 'profile' | 'signin' | 'signup' | 'forgot'
+  const [activeTab, setActiveTab] = useState(profile ? 'profile' : 'signin'); // 'profile' | 'signin' | 'signup' | 'forgot' | 'update_password'
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
@@ -35,10 +37,28 @@ export function AuthProfileModal({
   const [nameInput, setNameInput] = useState('');
   const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Inline feedback messages
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Listen for Supabase password recovery event
+  React.useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setActiveTab('update_password');
+        setErrorMessage('');
+        setSuccessMessage('Please enter your new password below.');
+      }
+    });
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, []);
 
   if (!isOpen) return null;
 
@@ -149,6 +169,39 @@ export function AuthProfileModal({
       setSuccessMessage(`Password reset link sent to ${cleanEmail}. Check your inbox!`);
     } catch (err) {
       setErrorMessage(err.message || 'Failed to send password reset email.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    clearFeedback();
+
+    const pass = newPasswordInput.trim();
+    const confirm = confirmPasswordInput.trim();
+
+    if (pass.length < 6) {
+      setErrorMessage('Password must be at least 6 characters long.');
+      return;
+    }
+    if (pass !== confirm) {
+      setErrorMessage('Passwords do not match. Please re-enter.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: pass });
+      if (error) throw new Error(error.message);
+      setSuccessMessage('Password updated successfully! You can now sign in.');
+      setNewPasswordInput('');
+      setConfirmPasswordInput('');
+      setTimeout(() => {
+        switchTab('signin');
+      }, 1500);
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to update password. Link may have expired.');
     } finally {
       setLoading(false);
     }
@@ -483,7 +536,7 @@ export function AuthProfileModal({
                 <div style={{ position: 'relative', marginTop: '0.25rem' }}>
                   <Lock size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: 'var(--text-muted)' }} />
                   <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     className="form-input"
                     placeholder="••••••••"
                     value={passwordInput}
@@ -491,10 +544,28 @@ export function AuthProfileModal({
                       setPasswordInput(e.target.value);
                       if (errorMessage) clearFeedback();
                     }}
-                    style={{ paddingLeft: '36px', width: '100%' }}
+                    style={{ paddingLeft: '36px', paddingRight: '36px', width: '100%' }}
                     disabled={loading}
                     required
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      top: '10px',
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
               </div>
 
@@ -569,7 +640,7 @@ export function AuthProfileModal({
                 <div style={{ position: 'relative', marginTop: '0.25rem' }}>
                   <Lock size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: 'var(--text-muted)' }} />
                   <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     className="form-input"
                     placeholder="Create a strong password"
                     value={passwordInput}
@@ -577,10 +648,28 @@ export function AuthProfileModal({
                       setPasswordInput(e.target.value);
                       if (errorMessage) clearFeedback();
                     }}
-                    style={{ paddingLeft: '36px', width: '100%' }}
+                    style={{ paddingLeft: '36px', paddingRight: '36px', width: '100%' }}
                     disabled={loading}
                     required
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      top: '10px',
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
               </div>
 
@@ -642,6 +731,113 @@ export function AuthProfileModal({
                   disabled={loading}
                 >
                   {loading ? 'Sending Link...' : 'Send Reset Link'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ width: '100%', justifyContent: 'center', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  onClick={() => switchTab('signin')}
+                  disabled={loading}
+                >
+                  <ArrowLeft size={14} /> Back to Sign In
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* VIEW 5: IN-APP UPDATE PASSWORD FORM */}
+          {activeTab === 'update_password' && (
+            <form onSubmit={handleUpdatePassword}>
+              <div style={{ marginBottom: '1rem', fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                Create a new secure password for your Hammer Pro account.
+              </div>
+
+              <div style={{ marginBottom: '0.85rem' }}>
+                <label className="form-label">New Password (min 6 characters)</label>
+                <div style={{ position: 'relative', marginTop: '0.25rem' }}>
+                  <Lock size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: 'var(--text-muted)' }} />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    className="form-input"
+                    placeholder="••••••••"
+                    value={newPasswordInput}
+                    onChange={(e) => {
+                      setNewPasswordInput(e.target.value);
+                      if (errorMessage) clearFeedback();
+                    }}
+                    style={{ paddingLeft: '36px', paddingRight: '36px', width: '100%' }}
+                    disabled={loading}
+                    required
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      top: '10px',
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label className="form-label">Confirm New Password</label>
+                <div style={{ position: 'relative', marginTop: '0.25rem' }}>
+                  <Lock size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: 'var(--text-muted)' }} />
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    className="form-input"
+                    placeholder="••••••••"
+                    value={confirmPasswordInput}
+                    onChange={(e) => {
+                      setConfirmPasswordInput(e.target.value);
+                      if (errorMessage) clearFeedback();
+                    }}
+                    style={{ paddingLeft: '36px', paddingRight: '36px', width: '100%' }}
+                    disabled={loading}
+                    required
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      top: '10px',
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <button
+                  type="submit"
+                  className="btn"
+                  style={{ width: '100%', justifyContent: 'center', padding: '0.65rem' }}
+                  disabled={loading}
+                >
+                  {loading ? 'Updating Password...' : 'Save New Password'}
                 </button>
                 <button
                   type="button"

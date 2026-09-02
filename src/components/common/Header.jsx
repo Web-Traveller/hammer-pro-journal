@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Cloud, User, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { Plus, Cloud, User, CheckCircle, AlertCircle, RefreshCw, Briefcase, ChevronDown } from 'lucide-react';
 
 export function Header({
   currentView,
@@ -9,7 +9,10 @@ export function Header({
   singleSessionAnalytics,
   userProfile,
   onOpenAuthModal,
-  syncState = {}
+  syncState = {},
+  hasUnsyncedChanges = false,
+  activeAccount = null,
+  onOpenAccountsModal
 }) {
   const titles = {
     singleSession: 'Single Session Deep-Dive',
@@ -38,36 +41,34 @@ export function Header({
         <p>{descriptions[currentView] || 'Trading analytics platform for Level 2 tape scalpers'}</p>
       </div>
 
-      <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-        {/* User Profile & Cross-Device Sync Status Pill */}
-        <button
-          className="header-user-btn"
-          onClick={onOpenAuthModal}
-          title={userProfile ? `Signed in as ${userProfile.name} • Click to manage account & cloud sync` : "Click to sign in or enable cross-device cloud sync"}
-        >
-          {userProfile ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <img
-                src={userProfile.avatarUrl}
-                alt={userProfile.name}
-                style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#fff' }}
-              />
-              <span style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main)' }}>
-                {userProfile.name.split(' ')[0]}
-              </span>
-              <span className="sync-status-dot dot-synced" title="Cloud Sync Active" />
-            </div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-muted)' }}>
-              <User size={15} />
-              <span style={{ fontWeight: 600, fontSize: '0.8rem' }}>Guest / Local</span>
-              <span className="sync-status-dot dot-offline" title="Working Offline" />
-            </div>
-          )}
-        </button>
+      <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'nowrap', flexShrink: 0 }}>
+        {/* Trading Account Switcher Pill */}
+        {onOpenAccountsModal && (
+          <button
+            type="button"
+            className="header-user-btn"
+            onClick={onOpenAccountsModal}
+            title="Switch or manage trading accounts (e.g. Premarket vs Market Hours)"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.4rem 0.75rem', flexShrink: 0 }}
+          >
+            <div
+              style={{
+                width: '9px',
+                height: '9px',
+                borderRadius: '50%',
+                backgroundColor: activeAccount?.color || '#10b981',
+                flexShrink: 0
+              }}
+            />
+            <span style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main)', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {activeAccount?.name || 'Main Account'}
+            </span>
+            <ChevronDown size={13} color="var(--text-muted)" />
+          </button>
+        )}
 
         {/* Timezone Switcher Pill */}
-        <div className="timezone-switcher" title="Toggle between US Eastern Market Time and Indian Standard Time (IST)">
+        <div className="timezone-switcher" style={{ flexShrink: 0 }} title="Toggle between US Eastern Market Time and Indian Standard Time (IST)">
           <button
             className={`timezone-btn ${timezone === 'US_EASTERN' ? 'active' : ''}`}
             onClick={() => onTimezoneChange('US_EASTERN')}
@@ -82,7 +83,7 @@ export function Header({
           </button>
         </div>
 
-        <button className="btn" onClick={() => setCurrentView('pasteLogs')}>
+        <button className="btn" style={{ whiteSpace: 'nowrap', flexShrink: 0 }} onClick={() => setCurrentView('pasteLogs')}>
           <Plus size={16} /> Import Session
         </button>
       </div>

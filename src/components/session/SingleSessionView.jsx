@@ -320,7 +320,7 @@ export function SingleSessionView({
                 ${((settings?.enableFees ? singleSessionAnalytics.netPnl : singleSessionAnalytics.pnl) || 0).toFixed(2)}
               </div>
               <span className="card-footer-tag tag-profit">
-                {settings?.enableFees ? `Gross: $${(singleSessionAnalytics.grossPnl || singleSessionAnalytics.pnl || 0).toFixed(2)} • Fees: $${(singleSessionAnalytics.fees || 0).toFixed(2)}` : `${(singleSessionAnalytics.consolidatedTrades || []).length} Trades Closed`}
+                {settings?.enableFees ? `Gross: $${(singleSessionAnalytics.grossPnl !== undefined ? singleSessionAnalytics.grossPnl : singleSessionAnalytics.pnl || 0).toFixed(2)} • Fees: $${(singleSessionAnalytics.fees || 0).toFixed(2)}` : `${(singleSessionAnalytics.consolidatedTrades && singleSessionAnalytics.consolidatedTrades.length > 0 ? singleSessionAnalytics.consolidatedTrades.length : (singleSessionAnalytics.totalTrades || singleSessionAnalytics.totalOrders || 0))} Trades Closed`}
               </span>
             </div>
 
@@ -345,10 +345,12 @@ export function SingleSessionView({
                 <button className="card-icon-btn"><FileText size={16} /></button>
               </div>
               <div className="card-value">
-                {(singleSessionAnalytics.consolidatedTrades || []).length} Trades
+                {(singleSessionAnalytics.consolidatedTrades && singleSessionAnalytics.consolidatedTrades.length > 0)
+                  ? singleSessionAnalytics.consolidatedTrades.length
+                  : (singleSessionAnalytics.totalTrades || singleSessionAnalytics.totalOrders || 0)} Trades
               </div>
               <span className="card-footer-tag" style={{ backgroundColor: '#f3f4f6', color: '#374151' }}>
-                {singleSessionAnalytics.totalFills || 0} Fills ({singleSessionAnalytics.roundTripShares || 0} Shs)
+                {singleSessionAnalytics.totalFills || singleSessionAnalytics.totalOrders || 0} Fills ({singleSessionAnalytics.roundTripShares || 0} Shs)
               </span>
             </div>
 
@@ -490,14 +492,12 @@ export function SingleSessionView({
             >
               <Zap size={15} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Tape Scalper &amp; Speed Breakdown
             </button>
-            {settings.enableJournal && (
-              <button 
-                className={`tab-btn ${sessionTab === 'journal' ? 'active' : ''}`}
-                onClick={() => setSessionTab('journal')}
-              >
-                <BookOpen size={15} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Session Journal
-              </button>
-            )}
+            <button 
+              className={`tab-btn ${sessionTab === 'journal' ? 'active' : ''}`}
+              onClick={() => setSessionTab('journal')}
+            >
+              <BookOpen size={15} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Session Journal
+            </button>
             <button 
               className={`tab-btn ${sessionTab === 'ecn' ? 'active' : ''}`}
               onClick={() => setSessionTab('ecn')}
@@ -795,7 +795,7 @@ export function SingleSessionView({
           )}
 
           {/* TAB 4: SESSION JOURNAL */}
-          {sessionTab === 'journal' && settings.enableJournal && (
+          {sessionTab === 'journal' && (
             <div>
               <div className="journal-highlight-grid">
                 <div className="journal-card journal-card-best">

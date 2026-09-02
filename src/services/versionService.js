@@ -32,10 +32,12 @@ export function compareSemver(v1, v2) {
  */
 export async function checkAppVersionStatus() {
   try {
-    const isMobile = typeof window !== 'undefined' && (
-      /android|iphone|ipad|ipod/i.test(navigator.userAgent || '') || 
-      window.innerWidth <= 768
-    );
+    const isTauriDesktop = typeof window !== 'undefined' && (window.__TAURI_INTERNALS__ !== undefined || window.__TAURI__ !== undefined);
+    const hasMobileUA = typeof window !== 'undefined' && /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent || '');
+    const isCapacitor = typeof window !== 'undefined' && (window.Capacitor !== undefined || window.isNativeMobile === true);
+    
+    // Explicit platform decision
+    const isMobile = (hasMobileUA || isCapacitor) && !isTauriDesktop;
 
     const { data: row } = await supabase
       .from('app_config')
@@ -44,15 +46,18 @@ export async function checkAppVersionStatus() {
       .maybeSingle();
 
     const config = row?.value || {
-      latest_version: CURRENT_APP_VERSION,
-      min_version: CURRENT_APP_VERSION,
+      latest_version_desktop: CURRENT_APP_VERSION,
+      min_version_desktop: CURRENT_APP_VERSION,
+      latest_version_mobile: '2.0.0',
+      min_version_mobile: '2.0.0',
       grace_period_days: 7,
-      download_url: 'https://github.com/Web-Traveller/hammer-pro-journal/releases'
+      download_url_desktop: 'https://github.com/Web-Traveller/hammer-pro-journal/releases/latest',
+      download_url_android: 'https://github.com/Web-Traveller/hammer-pro-journal/releases/latest'
     };
 
-    // Platform-Aware Version & Download Routing
+    // Platform-Aware Independent Version & Download Routing
     const latestVersion = isMobile
-      ? (config.latest_version_mobile || config.mobile?.latest_version || '2.0.0')
+      ? (config.latest_version_mobile || config.mobile?.latest_version || config.latest_version || '2.0.0')
       : (config.latest_version_desktop || config.desktop?.latest_version || config.latest_version || CURRENT_APP_VERSION);
 
     const minVersion = isMobile

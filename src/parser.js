@@ -493,8 +493,10 @@ export function consolidateRoundTripTrades(matchedTrades) {
         } else if (
             currentGroup.symbol === trade.symbol &&
             currentGroup.side === trade.side &&
-            Math.abs(trade.entryTime.getTime() - currentGroup.entryTime.getTime()) < 300000 &&
-            Math.abs(trade.exitTime.getTime() - currentGroup.exitTime.getTime()) < 300000
+            // Partial fills from the same order only: entry prices match within 1 cent ($0.01)
+            Math.abs(trade.entryPrice - currentGroup.entryPrice) < 0.01 &&
+            // Executed within 10 seconds of initial fill (same broker order execution window)
+            Math.abs(trade.entryTime.getTime() - currentGroup.entryTime.getTime()) < 10000
         ) {
             currentGroup.qty += trade.qty;
             currentGroup.totalCost += trade.entryPrice * trade.qty;
@@ -541,7 +543,7 @@ export function consolidateRoundTripTrades(matchedTrades) {
 /**
  * Level 2 Tape Scalper Deep-Dive Session Analytics
  */
-export function compileSingleDayAnalytics(executions, feePerRoundTripShare = 0.05, enableFees = true, timezone = 'US_EASTERN') {
+export function compileSingleDayAnalytics(executions, feePerRoundTripShare = 0.05, enableFees = true, timezone = 'US_EASTERN', journalTopTradesCount = 2) {
     if (!executions || executions.length === 0) return null;
 
     const sortedExecs = [...executions].sort((a, b) => {
@@ -808,10 +810,11 @@ export function compileSingleDayAnalytics(executions, feePerRoundTripShare = 0.0
     // Stock x Time Matrix
     const stockTimeMatrix = compileStockTimeMatrix(sortedExecs, feePerRoundTripShare, enableFees, timezone);
 
-    // Best and worst trades
+    // Best and worst trades (Respect user configurable count: min 1, max 10, default 2)
+    const topN = Math.max(1, Math.min(10, parseInt(journalTopTradesCount, 10) || 2));
     const sortedByPnl = [...consolidatedTrades].sort((a, b) => b.pnl - a.pnl);
-    const bestTrades = sortedByPnl.slice(0, 2);
-    const worstTrades = sortedByPnl.filter(t => t.pnl < 0).slice(-2).reverse();
+    const bestTrades = sortedByPnl.slice(0, topN);
+    const worstTrades = sortedByPnl.filter(t => t.pnl < 0).slice(-topN).reverse();
 
     return {
         pnl: grossPnl,
@@ -866,7 +869,7 @@ export function compileSingleDayAnalytics(executions, feePerRoundTripShare = 0.0
 /**
  * Main parser entry point - takes raw text and produces full day analytics
  */
-export function parseLogFile(rawText, feePerRoundTripShare = 0.05, enableFees = true, dateFormatSetting = 'DD-MM-YY', timezone = 'US_EASTERN') {
+export function parseLogFile(rawText, feePerRoundTripShare = 0.05, enableFees = true, dateFormatSetting = 'DD-MM-YY', timezone = 'US_EASTERN', journalTopTradesCount = 2) {
     if (!rawText || typeof rawText !== 'string') return null;
     const trimmed = rawText.trim();
 
@@ -875,11 +878,33 @@ export function parseLogFile(rawText, feePerRoundTripShare = 0.05, enableFees = 
         try {
             const manual = JSON.parse(trimmed);
             if (manual && (manual.isManualSummary || manual.type === 'manual_summary' || manual.netPnl !== undefined || manual.pnl !== undefined)) {
-                const netPnl = parseFloat(manual.netPnl ?? manual.pnl ?? 0) || 0;
+                const grossPnl = parseFloat(manual.grossPnl ?? manual.pnl ?? manual.netPnl ?? 0) || 0;
                 const totalShares = parseInt(manual.totalShares ?? manual.roundTripShares ?? 0, 10) || 0;
                 const roundTripShares = parseInt(manual.roundTripShares ?? manual.totalShares ?? 0, 10) || totalShares;
-                const calculatedFees = enableFees ? roundTripShares * feePerRoundTripShare : 0;
-                const grossPnl = parseFloat(manual.grossPnl ?? (netPnl + calculatedFees)) || netPnl;
+                
+                // Dynamic Fee Calculation:
+                // If fees are enabled, compute fees from round-trip shares (e.g. 55 shares * $0.05 = $2.75)
+                // unless explicitly provided in manual payload
+                let calculatedFees = 0;
+                if (enableFees) {
+                    if (manual.fees !== undefined && manual.fees !== null && !isNaN(parseFloat(manual.fees)) && parseFloat(manual.fees) > 0) {
+                        calculatedFees = parseFloat(manual.fees);
+                    } else {
+                        calculatedFees = roundTripShares * feePerRoundTripShare;
+                    }
+                }
+
+                // Net P&L Calculation:
+                // Net = Gross P&L - Fees (matching broker log behavior)
+                // unless the user entered an explicit custom Net P&L value
+                let netPnl = grossPnl - calculatedFees;
+                if (manual.netPnl !== undefined && manual.netPnl !== null && !isNaN(parseFloat(manual.netPnl)) && parseFloat(manual.netPnl) !== grossPnl) {
+                    netPnl = parseFloat(manual.netPnl);
+                    if (enableFees && calculatedFees === 0) {
+                        calculatedFees = Math.max(0, grossPnl - netPnl);
+                    }
+                }
+
                 const totalOrders = parseInt(manual.totalOrders ?? manual.tradesCount ?? manual.totalTrades ?? 1, 10) || 1;
                 const tradesCount = parseInt(manual.tradesCount ?? manual.totalTrades ?? totalOrders, 10) || totalOrders;
                 const winTradesCount = parseInt(manual.winTradesCount ?? manual.winningTrades ?? 0, 10) || (netPnl > 0 ? tradesCount : 0);
@@ -892,6 +917,7 @@ export function parseLogFile(rawText, feePerRoundTripShare = 0.05, enableFees = 
                 const stockBreakdown = symbols.map(sym => ({
                     symbol: sym,
                     pnl: netPnl / (symbols.length || 1),
+                    grossPnl: grossPnl / (symbols.length || 1),
                     netPnl: netPnl / (symbols.length || 1),
                     totalQty: Math.round(totalShares / (symbols.length || 1)),
                     tradesCount: Math.round(tradesCount / (symbols.length || 1)),
@@ -925,6 +951,7 @@ export function parseLogFile(rawText, feePerRoundTripShare = 0.05, enableFees = 
                     shortStats: { count: shortTrades, pnl: 0, volume: 0, winShares: 0, lossShares: 0 },
                     stockBreakdown,
                     matchedTrades: [],
+                    consolidatedTrades: [],
                     allExecutions: [],
                     ecnBreakdown: [],
                     openPositionsSummary: [],
@@ -946,7 +973,7 @@ export function parseLogFile(rawText, feePerRoundTripShare = 0.05, enableFees = 
 
     const executions = extractExecutions(rawText, null, dateFormatSetting);
     if (!executions || executions.length === 0) return null;
-    const analytics = compileSingleDayAnalytics(executions, feePerRoundTripShare, enableFees, timezone);
+    const analytics = compileSingleDayAnalytics(executions, feePerRoundTripShare, enableFees, timezone, journalTopTradesCount);
     if (analytics) {
         analytics.allExecutions = executions;
     }
