@@ -55,20 +55,25 @@ export async function checkAppVersionStatus() {
       download_url_android: 'https://github.com/Web-Traveller/hammer-pro-journal/releases/latest'
     };
 
-    // Platform-Aware Independent Version & Download Routing
-    const latestVersion = isMobile
-      ? (config.latest_version_mobile || config.mobile?.latest_version || config.latest_version || '2.0.0')
-      : (config.latest_version_desktop || config.desktop?.latest_version || config.latest_version || CURRENT_APP_VERSION);
+    // Platform-Aware Independent Version & Download Routing (NO generic global fallback)
+    let latestVersion = isMobile
+      ? (config.latest_version_mobile || config.mobile?.latest_version || '2.0.0')
+      : (config.latest_version_desktop || config.desktop?.latest_version || CURRENT_APP_VERSION);
 
-    const minVersion = isMobile
-      ? (config.min_version_mobile || config.mobile?.min_version || config.min_version || '2.0.0')
-      : (config.min_version_desktop || config.desktop?.min_version || config.min_version || CURRENT_APP_VERSION);
+    let minVersion = isMobile
+      ? (config.min_version_mobile || config.mobile?.min_version || '2.0.0')
+      : (config.min_version_desktop || config.desktop?.min_version || CURRENT_APP_VERSION);
+
+    // Sanity check: latestVersion cannot be lower than minVersion
+    if (compareSemver(latestVersion, minVersion) < 0) {
+      latestVersion = minVersion;
+    }
 
     const graceDays = config.grace_period_days || 7;
 
     const downloadUrl = isMobile
-      ? (config.download_url_android || config.mobile?.download_url || config.download_url || 'https://github.com/Web-Traveller/hammer-pro-journal/releases/latest')
-      : (config.download_url_desktop || config.desktop?.download_url || config.download_url || 'https://github.com/Web-Traveller/hammer-pro-journal/releases/latest');
+      ? (config.download_url_android || config.mobile?.download_url || 'https://github.com/Web-Traveller/hammer-pro-journal/releases/latest')
+      : (config.download_url_desktop || config.desktop?.download_url || 'https://github.com/Web-Traveller/hammer-pro-journal/releases/latest');
 
     // 1. If current version is below the absolute MINIMUM required version -> Instant Force Lock
     if (compareSemver(CURRENT_APP_VERSION, minVersion) < 0) {
