@@ -1,0 +1,11 @@
+{
+  "version": "2.2.0",
+  "notes": "Hammer Pro Journal v2.2.0: Multi-Account Isolation, Gross Realized P&L Manual Import, Admin Broadcast Banner, E2E Verification, and NSIS CurrentUser Packaging.",
+  "pub_date": "2026-09-02T00:00:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVScGh6OStMM2FBUVRZenV4TFlKR2hCZHlzUGJiSDlJVWtqRExQN2o3eEtzazVvOEkxMm51dVRXRG12ZHozVkpleER2cUhpdVBSTTBvL3BURzR6VGlxcCtGRW1sTW55Q0E0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4MzEwMzc1CWZpbGU6SGFtbWVyIFBybyBKb3VybmFsXzIuMi4wX3g2NC1zZXR1cC5leGUKZkFIM0tsMkJqeXFmYnhZekxMTXg0OGFaeUxnbnN0RUk0N21VSFpHTE1xSEt0RkNuTU43VStkc0VzRzNDc1hYd3VUZVBpZlhpVk9xbmR0aE5sVHB3QlE9PQo=",
+      "url": "https://github.com/Web-Traveller/hammer-pro-journal/releases/download/v2.2.0/Hammer.Pro.Journal_2.2.0_x64-setup.exe"
+    }
+  }
+}
