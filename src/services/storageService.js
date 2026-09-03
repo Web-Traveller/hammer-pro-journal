@@ -265,14 +265,14 @@ export async function removeLog(date, accountId = 'default') {
 /**
  * High-Capacity Screenshot Persistence (Tauri Disk / IndexedDB)
  */
-export async function loadScreenshotsFromStorage(date) {
+export async function loadScreenshotsFromStorage(date, accountId = 'default') {
   if (!date) return [];
   const cleanDate = date.trim();
 
   // 1. Try Tauri Disk Storage
   if (isTauriEnvironment()) {
     try {
-      const result = await safeTauriInvoke("load_session_screenshots", { date: cleanDate });
+      const result = await safeTauriInvoke("load_session_screenshots", { date: cleanDate, accountId });
       if (Array.isArray(result) && result.length > 0) {
         return result;
       }
@@ -303,7 +303,7 @@ export async function loadScreenshotsFromStorage(date) {
   }
 }
 
-export async function saveScreenshotsToStorage(date, screenshots) {
+export async function saveScreenshotsToStorage(date, screenshots, accountId = 'default') {
   if (!date || !Array.isArray(screenshots)) return;
   const cleanDate = date.trim();
 
@@ -315,7 +315,8 @@ export async function saveScreenshotsToStorage(date, screenshots) {
       await safeTauriInvoke("save_screenshot", {
         date: cleanDate,
         filename: img.filename,
-        dataUrl: img.dataUrl
+        dataUrl: img.dataUrl,
+        accountId
       });
     }
 
@@ -324,13 +325,13 @@ export async function saveScreenshotsToStorage(date, screenshots) {
   }
 }
 
-export async function deleteScreenshotFromStorage(date, filename) {
+export async function deleteScreenshotFromStorage(date, filename, accountId = 'default') {
   if (!date || !filename) return;
   const cleanDate = date.trim();
 
   if (isTauriEnvironment()) {
     const finalName = filename.startsWith(`${cleanDate}_`) ? filename : `${cleanDate}_img_${filename}`;
-    await safeTauriInvoke("delete_screenshot", { filename: finalName });
+    await safeTauriInvoke("delete_screenshot", { filename: finalName, accountId });
   }
 
   await idbDeleteScreenshot(cleanDate, filename);
@@ -507,7 +508,52 @@ export async function uploadToGoogleDrive(accessToken, folderId, snapshotData) {
   return await res.json();
 }
 
+/**
+ * Persist Accounts list to Tauri disk and LocalStorage
+ */
+export async function persistAccountsConfig(accountsList) {
+  if (!Array.isArray(accountsList)) return;
+  const json = JSON.stringify(accountsList);
+  try {
+    localStorage.setItem('hammer_user_accounts', json);
+  } catch (e) {}
+  await safeTauriInvoke("save_accounts_config", { jsonContent: json });
+}
+
+/**
+ * Retrieve Accounts list from Tauri disk or LocalStorage
+ */
+export async function retrieveAccountsConfig() {
+  if (isTauriEnvironment()) {
+    try {
+      const raw = await safeTauriInvoke("load_accounts_config");
+      if (raw && typeof raw === 'string' && raw.trim().startsWith('[')) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          try {
+            localStorage.setItem('hammer_user_accounts', raw);
+          } catch (e) {}
+          return parsed;
+        }
+      }
+    } catch (e) {}
+  }
+
+  try {
+    const local = localStorage.getItem('hammer_user_accounts');
+    if (local) {
+      const parsed = JSON.parse(local);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {}
+
+  return null;
+}
+
 // Aliases
 export const loadLogsFromStorage = retrieveAllLogs;
 export const saveLogToStorage = persistLog;
 export const deleteLogFromStorage = removeLog;
+

@@ -79,15 +79,13 @@ export function activateTrialSkip() {
  */
 export async function checkLicenseAndAccess(userProfile = null) {
   const profile = userProfile || getActiveUserProfile();
-  const deviceId = await getDeviceFingerprint();
-  const storedKey = localStorage.getItem(ACTIVATED_KEY_STORAGE) || profile?.license_key;
 
   try {
     // 1. Check if user profile is explicitly blocked/banned in Supabase
     if (profile && profile.id) {
       const { data: dbProfile } = await supabase
         .from('user_profiles')
-        .select('is_blocked, license_key')
+        .select('is_blocked, can_cloud_sync, daily_image_limit')
         .eq('id', profile.id)
         .maybeSingle();
 
@@ -96,114 +94,46 @@ export async function checkLicenseAndAccess(userProfile = null) {
           allowed: false,
           status: 'blocked',
           reason: 'Access Suspended',
-          message: 'Your account or device access has been locked by the administrator.'
+          message: 'Your account access has been suspended by the administrator.'
         };
+      }
+
+      // Update cached profile entitlements if fetched
+      if (dbProfile) {
+        profile.canCloudSync = dbProfile.can_cloud_sync ?? false;
+        profile.dailyImageLimit = dbProfile.daily_image_limit ?? 0;
+        profile.isBlocked = dbProfile.is_blocked ?? false;
+        saveActiveUserProfile(profile);
       }
     }
 
-    // 2. Verify stored key in Supabase licenses table if available
-    const activeKey = storedKey || profile?.license_key;
-
-    if (activeKey) {
-      const cleanKey = activeKey.trim().toUpperCase();
-      const { data: dbLicense, error: licErr } = await supabase
-        .from('licenses')
-        .select('*')
-        .eq('license_key', cleanKey)
-        .maybeSingle();
-
-      if (!licErr && dbLicense) {
-        if (!dbLicense.is_active) {
-          return {
-            allowed: false,
-            status: 'revoked',
-            reason: 'License Deactivated',
-            message: 'This license key has been deactivated by the administrator.'
-          };
-        }
-
-        if (dbLicense.expires_at && new Date(dbLicense.expires_at) < new Date()) {
-          return {
-            allowed: false,
-            status: 'expired',
-            reason: 'License Expired',
-            message: `This license expired on ${new Date(dbLicense.expires_at).toLocaleDateString()}.`
-          };
-        }
-
-        // Check device capacity limits (e.g. max_users / max_devices)
-        const maxDevs = dbLicense.max_devices || dbLicense.max_users || 1;
-        let boundDevices = Array.isArray(dbLicense.bound_devices) ? dbLicense.bound_devices : [];
-        if (dbLicense.device_fingerprint && !boundDevices.includes(dbLicense.device_fingerprint)) {
-          boundDevices.push(dbLicense.device_fingerprint);
-        }
-
-        if (!boundDevices.includes(deviceId)) {
-          if (boundDevices.length >= maxDevs) {
-            return {
-              allowed: false,
-              status: 'device_limit_reached',
-              reason: 'Device Limit Exceeded',
-              message: `This activation key is limited to ${maxDevs} device(s). Maximum device limit reached.`
-            };
-          }
-          // Bind new device
-          boundDevices.push(deviceId);
-          await supabase
-            .from('licenses')
-            .update({ bound_devices: boundDevices, device_fingerprint: deviceId })
-            .eq('id', dbLicense.id);
-        }
-
-        return {
-          allowed: true,
-          status: 'active',
-          licenseKey: cleanKey,
-          features: dbLicense.features || { allow_cloud_sync: true, max_screenshots: 999 },
-          license: dbLicense,
-          deviceId
-        };
+    // 2. License key requirement is PAUSED in favor of mandatory user accounts
+    return {
+      allowed: true,
+      status: 'active',
+      features: {
+        allow_cloud_sync: profile?.canCloudSync ?? false,
+        max_screenshots: profile?.dailyImageLimit ?? 0
       }
-    }
-
-    // 3. No valid license key found -> Check 24-Hour Trial Status
-    const trial = getTrialStatus();
-    if (trial.active) {
+    };
+  } catch (err) {
+    // Offline resilience: allow local usage if already signed in and not blocked
+    if (profile?.isBlocked) {
       return {
-        allowed: true,
-        status: 'trial_active',
-        hoursLeft: trial.hoursLeft,
-        trialUsed: true,
-        features: { allow_cloud_sync: false, max_screenshots: 1 },
-        message: `24-Hour Trial Active (${trial.hoursLeft}h remaining). Local offline features enabled.`
+        allowed: false,
+        status: 'blocked',
+        reason: 'Access Suspended',
+        message: 'Your account access has been suspended by the administrator.'
       };
     }
 
-    // Trial expired or not used -> Require License Key Activation
     return {
-      allowed: false,
-      status: 'license_required',
-      trialUsed: trial.used,
-      trialExpired: trial.expired || false,
-      reason: trial.expired ? 'Trial Expired' : 'Activation Code Required',
-      message: trial.expired
-        ? 'Your 24-hour trial period has expired. Please enter an Activation Code to continue using Hammer Pro Journal.'
-        : 'Please enter your Activation Code / License Key to unlock Hammer Pro Journal.'
-    };
-
-  } catch (err) {
-    console.warn('License verification note:', err);
-    // Offline / fallback check: check trial status
-    const trial = getTrialStatus();
-    if (storedKey || trial.active) {
-      return { allowed: true, status: 'offline_cached', features: { allow_cloud_sync: false, max_screenshots: 1 } };
-    }
-    return {
-      allowed: false,
-      status: 'license_required',
-      trialUsed: trial.used,
-      reason: 'Activation Code Required',
-      message: 'Please enter your Activation Code / License Key to unlock.'
+      allowed: true,
+      status: 'active',
+      features: {
+        allow_cloud_sync: profile?.canCloudSync ?? false,
+        max_screenshots: profile?.dailyImageLimit ?? 0
+      }
     };
   }
 }

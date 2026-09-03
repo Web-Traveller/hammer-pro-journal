@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { retrieveAccountsConfig, persistAccountsConfig } from '../services/storageService';
 
 const ACCOUNTS_STORAGE_KEY = 'hammer_user_accounts';
 const ACTIVE_ACCOUNT_STORAGE_KEY = 'hammer_active_account_id';
@@ -21,6 +22,19 @@ export function useAccountState(showToast) {
     return DEFAULT_ACCOUNTS;
   });
 
+  // Load from disk if available
+  useEffect(() => {
+    async function loadDiskAccounts() {
+      try {
+        const diskAccounts = await retrieveAccountsConfig();
+        if (diskAccounts && Array.isArray(diskAccounts) && diskAccounts.length > 0) {
+          setAccounts(diskAccounts);
+        }
+      } catch (e) {}
+    }
+    loadDiskAccounts();
+  }, []);
+
   const [activeAccountId, setActiveAccountId] = useState(() => {
     try {
       const stored = localStorage.getItem(ACTIVE_ACCOUNT_STORAGE_KEY);
@@ -34,11 +48,7 @@ export function useAccountState(showToast) {
   // Sync accounts to storage
   const saveAccounts = useCallback((newAccounts) => {
     setAccounts(newAccounts);
-    try {
-      localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(newAccounts));
-    } catch (e) {
-      console.error('Failed to save accounts list:', e);
-    }
+    persistAccountsConfig(newAccounts);
   }, []);
 
   const handleSwitchAccount = useCallback((accountId) => {

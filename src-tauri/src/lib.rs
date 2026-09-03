@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tauri::Manager;
 
 fn sanitize_input(input: &str) -> String {
@@ -10,14 +10,30 @@ fn sanitize_input(input: &str) -> String {
         .collect()
 }
 
+fn get_account_logs_dir(app_handle: &tauri::AppHandle, account_id: Option<String>) -> Result<PathBuf, String> {
+    let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let base_logs_dir = app_dir.join("logs");
+
+    match account_id {
+        Some(id) => {
+            let clean_id = sanitize_input(&id);
+            if clean_id.is_empty() || clean_id == "default" {
+                Ok(base_logs_dir)
+            } else {
+                Ok(base_logs_dir.join("accounts").join(clean_id))
+            }
+        }
+        None => Ok(base_logs_dir),
+    }
+}
+
 #[tauri::command]
-fn save_log(app_handle: tauri::AppHandle, date: String, content: String) -> Result<(), String> {
+fn save_log(app_handle: tauri::AppHandle, date: String, content: String, account_id: Option<String>) -> Result<(), String> {
     let clean_date = sanitize_input(&date);
     if clean_date.is_empty() {
         return Err("Invalid date parameter".to_string());
     }
-    let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
-    let logs_dir = app_dir.join("logs");
+    let logs_dir = get_account_logs_dir(&app_handle, account_id)?;
     fs::create_dir_all(&logs_dir).map_err(|e| e.to_string())?;
     let file_path = logs_dir.join(format!("{}.txt", clean_date));
 
@@ -38,9 +54,8 @@ fn save_log(app_handle: tauri::AppHandle, date: String, content: String) -> Resu
 }
 
 #[tauri::command]
-fn load_all_logs(app_handle: tauri::AppHandle) -> Result<HashMap<String, String>, String> {
-    let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
-    let logs_dir = app_dir.join("logs");
+fn load_all_logs(app_handle: tauri::AppHandle, account_id: Option<String>) -> Result<HashMap<String, String>, String> {
+    let logs_dir = get_account_logs_dir(&app_handle, account_id)?;
     let mut logs = HashMap::new();
     
     if logs_dir.exists() {
@@ -61,13 +76,12 @@ fn load_all_logs(app_handle: tauri::AppHandle) -> Result<HashMap<String, String>
 }
 
 #[tauri::command]
-fn delete_log(app_handle: tauri::AppHandle, date: String) -> Result<(), String> {
+fn delete_log(app_handle: tauri::AppHandle, date: String, account_id: Option<String>) -> Result<(), String> {
     let clean_date = sanitize_input(&date);
     if clean_date.is_empty() {
         return Ok(());
     }
-    let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
-    let logs_dir = app_dir.join("logs");
+    let logs_dir = get_account_logs_dir(&app_handle, account_id)?;
     let file_path = logs_dir.join(format!("{}.txt", clean_date));
     if file_path.exists() {
         let _ = fs::remove_file(file_path);
@@ -92,14 +106,13 @@ fn delete_log(app_handle: tauri::AppHandle, date: String) -> Result<(), String> 
 }
 
 #[tauri::command]
-fn get_log_dir(app_handle: tauri::AppHandle) -> Result<String, String> {
-    let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
-    let logs_dir = app_dir.join("logs");
+fn get_log_dir(app_handle: tauri::AppHandle, account_id: Option<String>) -> Result<String, String> {
+    let logs_dir = get_account_logs_dir(&app_handle, account_id)?;
     Ok(logs_dir.to_string_lossy().into_owned())
 }
 
 #[tauri::command]
-fn save_screenshot(app_handle: tauri::AppHandle, date: String, filename: String, data_url: String) -> Result<(), String> {
+fn save_screenshot(app_handle: tauri::AppHandle, date: String, filename: String, data_url: String, account_id: Option<String>) -> Result<(), String> {
     let clean_date = sanitize_input(&date);
     let clean_filename = sanitize_input(&filename);
     if clean_date.is_empty() || clean_filename.is_empty() {
@@ -112,8 +125,7 @@ fn save_screenshot(app_handle: tauri::AppHandle, date: String, filename: String,
         format!("{}_img_{}", clean_date, clean_filename)
     };
 
-    let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
-    let logs_dir = app_dir.join("logs");
+    let logs_dir = get_account_logs_dir(&app_handle, account_id)?;
     fs::create_dir_all(&logs_dir).map_err(|e| e.to_string())?;
     let file_path = logs_dir.join(final_name);
     fs::write(file_path, data_url).map_err(|e| e.to_string())?;
@@ -121,10 +133,9 @@ fn save_screenshot(app_handle: tauri::AppHandle, date: String, filename: String,
 }
 
 #[tauri::command]
-fn load_session_screenshots(app_handle: tauri::AppHandle, date: String) -> Result<Vec<HashMap<String, String>>, String> {
+fn load_session_screenshots(app_handle: tauri::AppHandle, date: String, account_id: Option<String>) -> Result<Vec<HashMap<String, String>>, String> {
     let clean_date = sanitize_input(&date);
-    let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
-    let logs_dir = app_dir.join("logs");
+    let logs_dir = get_account_logs_dir(&app_handle, account_id)?;
     let mut screenshots = Vec::new();
     let prefix = format!("{}_img_", clean_date);
     let alt_prefix = format!("{}_", clean_date);
@@ -152,17 +163,37 @@ fn load_session_screenshots(app_handle: tauri::AppHandle, date: String) -> Resul
 }
 
 #[tauri::command]
-fn delete_screenshot(app_handle: tauri::AppHandle, filename: String) -> Result<(), String> {
+fn delete_screenshot(app_handle: tauri::AppHandle, filename: String, account_id: Option<String>) -> Result<(), String> {
     let clean_filename = sanitize_input(&filename);
     if clean_filename.is_empty() {
         return Ok(());
     }
-    let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
-    let file_path = app_dir.join("logs").join(clean_filename);
+    let logs_dir = get_account_logs_dir(&app_handle, account_id)?;
+    let file_path = logs_dir.join(clean_filename);
     if file_path.exists() {
         let _ = fs::remove_file(file_path);
     }
     Ok(())
+}
+
+#[tauri::command]
+fn save_accounts_config(app_handle: tauri::AppHandle, json_content: String) -> Result<(), String> {
+    let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    fs::create_dir_all(&app_dir).map_err(|e| e.to_string())?;
+    let file_path = app_dir.join("accounts.json");
+    fs::write(file_path, json_content).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn load_accounts_config(app_handle: tauri::AppHandle) -> Result<String, String> {
+    let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let file_path = app_dir.join("accounts.json");
+    if file_path.exists() {
+        fs::read_to_string(file_path).map_err(|e| e.to_string())
+    } else {
+        Ok("[]".to_string())
+    }
 }
 
 #[tauri::command]
@@ -207,6 +238,8 @@ pub fn run() {
             save_screenshot,
             load_session_screenshots,
             delete_screenshot,
+            save_accounts_config,
+            load_accounts_config,
             sync_local_directory
         ])
         .run(tauri::generate_context!())

@@ -20,6 +20,7 @@ import { AuthProfileModal } from './components/modals/AuthProfileModal';
 import { AccountsModal } from './components/modals/AccountsModal';
 import { ForceUpdateModal } from './components/modals/ForceUpdateModal';
 import { LicenseGateModal } from './components/modals/LicenseGateModal';
+import { MandatoryAuthGateModal } from './components/modals/MandatoryAuthGateModal';
 import { AnnouncementBanner } from './components/common/AnnouncementBanner';
 import { MobileApp } from './mobile/MobileApp';
 import { MobileAuthScreen } from './mobile/components/MobileAuthScreen';
@@ -142,6 +143,13 @@ export default function App() {
 
         {/* 7-Day Hard Expiry & Force Update Modal */}
         <ForceUpdateModal versionStatus={state.versionStatus} />
+
+        {/* Mandatory User Account Authentication Gate */}
+        <MandatoryAuthGateModal
+          isOpen={!state.userProfile || !state.userProfile.id}
+          onAuthenticated={state.handleAuthenticatedUser}
+          onToast={state.showToast}
+        />
 
         {/* Cloud Licensing & Device Lock Gate */}
         <LicenseGateModal
@@ -399,6 +407,13 @@ export default function App() {
 
         {/* 7-DAY HARD EXPIRY & MANDATORY FORCE UPDATE MODAL */}
         <ForceUpdateModal versionStatus={state.versionStatus} />
+
+        {/* MANDATORY USER ACCOUNT AUTHENTICATION GATE */}
+        <MandatoryAuthGateModal
+          isOpen={!state.userProfile || !state.userProfile.id}
+          onAuthenticated={state.handleAuthenticatedUser}
+          onToast={state.showToast}
+        />
 
         {/* CRYPTOGRAPHIC CLOUD LICENSING & ACTIVATION GATE */}
         <LicenseGateModal

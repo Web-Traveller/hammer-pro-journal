@@ -126,6 +126,9 @@ export async function signUpUser(name, email, password, options = {}) {
       name: cleanName,
       email: cleanEmail,
       plan_tier: 'free',
+      can_cloud_sync: false,
+      daily_image_limit: 0,
+      is_blocked: false,
       avatar_url: avatarUrl,
       updated_at: new Date().toISOString()
     });
@@ -138,6 +141,9 @@ export async function signUpUser(name, email, password, options = {}) {
     name: cleanName,
     email: cleanEmail,
     planTier: 'free',
+    canCloudSync: false,
+    dailyImageLimit: 0,
+    isBlocked: false,
     avatarUrl,
     createdAt: user.created_at || new Date().toISOString(),
     lastSyncTimestamp: Date.now(),
@@ -176,6 +182,9 @@ export async function signInUser(email, password) {
   // 2. Query user_profiles table
   let profileName = user.user_metadata?.name || cleanEmail.split('@')[0];
   let planTier = user.user_metadata?.planTier || 'free';
+  let canCloudSync = false;
+  let dailyImageLimit = 0;
+  let isBlocked = false;
   let avatarUrl = `https://api.dicebear.com/7.x/bottts/svg?seed=${user.id}`;
 
   try {
@@ -189,13 +198,19 @@ export async function signInUser(email, password) {
       if (dbProfile.name) profileName = dbProfile.name;
       if (dbProfile.plan_tier) planTier = dbProfile.plan_tier;
       if (dbProfile.avatar_url) avatarUrl = dbProfile.avatar_url;
+      canCloudSync = dbProfile.can_cloud_sync ?? false;
+      dailyImageLimit = dbProfile.daily_image_limit ?? 0;
+      isBlocked = dbProfile.is_blocked ?? false;
     } else {
-      // Upsert profile if missing
+      // Upsert profile if missing with defaults
       await supabase.from('user_profiles').upsert({
         id: user.id,
         name: profileName,
         email: cleanEmail,
         plan_tier: planTier,
+        can_cloud_sync: false,
+        daily_image_limit: 0,
+        is_blocked: false,
         avatar_url: avatarUrl
       });
     }
@@ -208,6 +223,9 @@ export async function signInUser(email, password) {
     name: profileName,
     email: cleanEmail,
     planTier,
+    canCloudSync,
+    dailyImageLimit,
+    isBlocked,
     avatarUrl,
     createdAt: user.created_at || new Date().toISOString(),
     lastSyncTimestamp: Date.now(),
@@ -274,11 +292,10 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}) {
     return { success: false, error: 'Please sign in to enable Hammer Pro Cloud Sync.' };
   }
 
-  // Developer License Gate: Cloud Sync strictly requires an active License Key
-  const activeLicenseKey = profile.license_key || (typeof localStorage !== 'undefined' ? localStorage.getItem('hammer_activated_license_key') : null);
-  if (!activeLicenseKey) {
-    notifySyncStatus('local_only', 'Local offline mode (Cloud sync requires an active License Key).');
-    return { success: false, error: 'Cloud Sync is a Pro feature and requires an active License Key.' };
+  // Cloud Sync Entitlement Gate (Managed by Admin in Supabase user_profiles)
+  if (!profile.canCloudSync) {
+    notifySyncStatus('local_only', 'Cloud Sync is not enabled for your account. Working in Local Storage mode.');
+    return { success: false, mode: 'local', error: 'Cloud Sync is disabled for your account. Contact the administrator to enable cloud sync.' };
   }
 
   try {
@@ -415,10 +432,14 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}) {
         }
 
         const screenshotKeys = [];
-        for (const img of screenshots) {
-          if (img.dataUrl) {
-            const key = await uploadScreenshotToCloud(profile.id, dateStr, img.filename, img.dataUrl);
-            if (key) screenshotKeys.push({ filename: img.filename, key });
+        const maxImages = profile.dailyImageLimit ?? 0;
+        if (maxImages > 0 && screenshots && screenshots.length > 0) {
+          const imgsToUpload = screenshots.slice(0, maxImages);
+          for (const img of imgsToUpload) {
+            if (img.dataUrl) {
+              const key = await uploadScreenshotToCloud(profile.id, dateStr, img.filename, img.dataUrl);
+              if (key) screenshotKeys.push({ filename: img.filename, key });
+            }
           }
         }
 

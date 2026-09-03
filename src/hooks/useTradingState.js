@@ -109,12 +109,19 @@ export function useTradingState() {
 
   const queueDeferredSync = useCallback((explicitUpdatedLogs = null) => {
     const p = getActiveUserProfile();
-    if (p && p.cloudProvider === 'supabase_cloud') {
+    if (p && p.cloudProvider === 'supabase_cloud' && p.canCloudSync === true) {
       pendingSyncRef.current = true;
       setHasUnsyncedChanges(true);
     } else {
       pendingSyncRef.current = false;
       setHasUnsyncedChanges(false);
+    }
+  }, []);
+
+  const handleAuthenticatedUser = useCallback((profile) => {
+    setUserProfile(profile);
+    if (profile && profile.canCloudSync === true) {
+      executeTwoTierSync();
     }
   }, []);
 
@@ -161,6 +168,7 @@ export function useTradingState() {
   const screenshotHandlers = useScreenshotHandlers({
     sessionDate,
     licenseCheck,
+    userProfile,
     showToast,
     activeAccountId
   });
@@ -699,6 +707,7 @@ export function useTradingState() {
     handleRecheckLicense,
     showLicenseModal,
     setShowLicenseModal,
+    handleAuthenticatedUser,
 
     // Multi-Account Additions
     accounts: accountState.accounts,
