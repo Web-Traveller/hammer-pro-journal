@@ -135,13 +135,13 @@ export function SettingsView({
                 </span>
               </div>
               <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                {userProfile ? userProfile.email : 'Your logs are currently stored locally on this machine.'}
+                {userProfile ? (userProfile.canCloudSync ? `${userProfile.email} • Cloud Sync Active` : `${userProfile.email} • Local Storage Mode`) : 'Sign in to access your account.'}
               </div>
             </div>
           </div>
 
           <button className="btn" onClick={onOpenAuthModal} style={{ fontSize: '0.82rem', padding: '0.5rem 1rem' }}>
-            <User size={15} /> {userProfile ? 'Manage Account & Cloud Sync' : 'Sign In / Enable Cloud Sync'}
+            <User size={15} /> {userProfile ? 'Manage Account' : 'Sign In'}
           </button>
         </div>
       </div>

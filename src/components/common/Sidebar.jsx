@@ -83,13 +83,13 @@ export function Sidebar({ currentView, setCurrentView, userProfile, onOpenAuthMo
             position: 'relative'
           }}
           className="sidebar-profile-card"
-          title={userProfile ? `Signed in as ${userProfile.name} • Click to manage account & cloud sync` : "Click to sign in or enable cross-device cloud sync"}
+          title={userProfile?.id ? `Signed in as ${userProfile.name} • Click to manage account` : "Click to sign in"}
         >
-          {userProfile && userProfile.cloudProvider === 'supabase_cloud' ? (
+          {userProfile && userProfile.id ? (
             <>
               <div style={{ position: 'relative' }}>
                 <img
-                  src={userProfile.avatarUrl}
+                  src={userProfile.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${userProfile.id}`}
                   alt={userProfile.name}
                   style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#fff', border: '1px solid var(--border-light)' }}
                 />
@@ -101,7 +101,7 @@ export function Sidebar({ currentView, setCurrentView, userProfile, onOpenAuthMo
                     width: '8px',
                     height: '8px',
                     borderRadius: '50%',
-                    backgroundColor: hasUnsyncedChanges ? '#f59e0b' : '#10b981',
+                    backgroundColor: userProfile.canCloudSync ? (hasUnsyncedChanges ? '#f59e0b' : '#10b981') : '#94a3b8',
                     border: '1.5px solid #fff'
                   }}
                 />
@@ -110,8 +110,8 @@ export function Sidebar({ currentView, setCurrentView, userProfile, onOpenAuthMo
                 <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {userProfile.name}
                 </div>
-                <div style={{ fontSize: '0.68rem', color: hasUnsyncedChanges ? '#d97706' : 'var(--hero-green)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                  <Cloud size={10} /> {hasUnsyncedChanges ? 'Sync Pending' : (userProfile.planTier === 'pro' ? 'Pro Cloud Sync' : 'Free Sync')}
+                <div style={{ fontSize: '0.68rem', color: userProfile.canCloudSync ? (hasUnsyncedChanges ? '#d97706' : 'var(--hero-green)') : 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  <Cloud size={10} /> {userProfile.canCloudSync ? (hasUnsyncedChanges ? 'Sync Pending' : (userProfile.planTier === 'pro' ? 'Pro Cloud' : 'Cloud Sync')) : 'Local Storage'}
                 </div>
               </div>
             </>
@@ -122,9 +122,9 @@ export function Sidebar({ currentView, setCurrentView, userProfile, onOpenAuthMo
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                  {userProfile?.name ? userProfile.name : 'Guest Trader'}
+                  Sign In
                 </div>
-                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Offline / Local Mode</div>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Account Required</div>
               </div>
             </>
           )}

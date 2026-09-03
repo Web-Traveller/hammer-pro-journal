@@ -259,6 +259,38 @@ export function updateUserProfile(updates) {
 }
 
 /**
+ * Refresh user profile from Supabase user_profiles table (e.g. Admin updated permissions)
+ */
+export async function refreshUserProfile() {
+  const current = getActiveUserProfile();
+  if (!current || !current.id) return null;
+  try {
+    const { data: dbProfile, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', current.id)
+      .maybeSingle();
+
+    if (!error && dbProfile) {
+      const updated = {
+        ...current,
+        name: dbProfile.name || current.name,
+        planTier: dbProfile.plan_tier || current.planTier,
+        canCloudSync: dbProfile.can_cloud_sync ?? false,
+        dailyImageLimit: dbProfile.daily_image_limit ?? 0,
+        isBlocked: dbProfile.is_blocked ?? false,
+        avatarUrl: dbProfile.avatar_url || current.avatarUrl
+      };
+      saveActiveUserProfile(updated);
+      return updated;
+    }
+  } catch (e) {
+    console.warn('refreshUserProfile note:', e);
+  }
+  return current;
+}
+
+/**
  * Fetch a single session's raw log on-demand (Lazy Loading)
  */
 export async function fetchOnDemandSessionLog(sessionDate) {

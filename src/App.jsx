@@ -127,6 +127,9 @@ export default function App() {
           onClose={() => state.setShowAuthModal(false)}
           onToast={state.showToast}
           dailyStatsMap={state.dailyStatsMap}
+          userProfile={state.userProfile}
+          onProfileUpdated={state.handleAuthenticatedUser}
+          onSignOut={() => state.handleAuthenticatedUser(null)}
         />
 
         {/* Mobile Accounts Modal */}
@@ -374,6 +377,9 @@ export default function App() {
           onClose={() => state.setShowAuthModal(false)}
           onToast={state.showToast}
           dailyStatsMap={state.dailyStatsMap}
+          userProfile={state.userProfile}
+          onProfileUpdated={state.handleAuthenticatedUser}
+          onSignOut={() => state.handleAuthenticatedUser(null)}
         />
 
         {/* TRADING ACCOUNTS MODAL */}

@@ -109,7 +109,7 @@ export function useTradingState() {
 
   const queueDeferredSync = useCallback((explicitUpdatedLogs = null) => {
     const p = getActiveUserProfile();
-    if (p && p.cloudProvider === 'supabase_cloud' && p.canCloudSync === true) {
+    if (p && p.canCloudSync === true) {
       pendingSyncRef.current = true;
       setHasUnsyncedChanges(true);
     } else {
@@ -237,7 +237,7 @@ export function useTradingState() {
 
         const profile = getActiveUserProfile();
         setUserProfile(profile);
-        if (profile && profile.cloudProvider === 'supabase_cloud') {
+        if (profile && profile.canCloudSync === true) {
           executeTwoTierSync();
         }
       } catch (err) {
@@ -279,7 +279,7 @@ export function useTradingState() {
     const syncInterval = setInterval(() => {
       if (pendingSyncRef.current) {
         const p = getActiveUserProfile();
-        if (p && p.cloudProvider === 'supabase_cloud') {
+        if (p && p.canCloudSync === true) {
           executeTwoTierSync(dailyStatsMap).then(res => {
             if (res && res.success) {
               pendingSyncRef.current = false;
@@ -305,7 +305,7 @@ export function useTradingState() {
       lastFocusSyncTime = now;
 
       const p = getActiveUserProfile();
-      if (p && p.cloudProvider === 'supabase_cloud') {
+      if (p && p.canCloudSync === true) {
         executeTwoTierSync();
       }
     };

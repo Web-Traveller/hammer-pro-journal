@@ -18,7 +18,8 @@ import {
   signInUser,
   signOutUser,
   executeTwoTierSync,
-  updateUserProfile
+  updateUserProfile,
+  refreshUserProfile
 } from '../../services/authService';
 import { supabase } from '../../services/supabaseClient';
 
@@ -26,10 +27,16 @@ export function AuthProfileModal({
   isOpen,
   onClose,
   onToast,
-  dailyStatsMap = {}
+  dailyStatsMap = {},
+  userProfile = null,
+  onProfileUpdated,
+  onSignOut
 }) {
-  const [profile, setProfile] = useState(getActiveUserProfile());
-  const [activeTab, setActiveTab] = useState(profile ? 'profile' : 'signin'); // 'profile' | 'signin' | 'signup' | 'forgot' | 'update_password'
+  const [profile, setProfile] = useState(() => userProfile || getActiveUserProfile());
+  const [activeTab, setActiveTab] = useState(() => {
+    const current = userProfile || getActiveUserProfile();
+    return (current && current.id) ? 'profile' : 'signin';
+  });
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
@@ -45,6 +52,28 @@ export function AuthProfileModal({
   // Inline feedback messages
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Keep state synchronized whenever modal is opened or userProfile changes
+  React.useEffect(() => {
+    if (isOpen) {
+      const active = userProfile || getActiveUserProfile();
+      setProfile(active);
+      if (active && active.id) {
+        setActiveTab('profile');
+        // Refresh latest admin permissions & limits from Supabase user_profiles
+        refreshUserProfile().then((refreshed) => {
+          if (refreshed && refreshed.id) {
+            setProfile(refreshed);
+            if (onProfileUpdated) onProfileUpdated(refreshed);
+          }
+        }).catch(() => {});
+      } else {
+        setActiveTab('signin');
+      }
+      setErrorMessage('');
+      setSuccessMessage('');
+    }
+  }, [isOpen, userProfile]);
 
   // Listen for Supabase password recovery event
   React.useEffect(() => {
@@ -89,8 +118,11 @@ export function AuthProfileModal({
       const user = await signInUser(cleanEmail, cleanPassword);
       setProfile(user);
       setActiveTab('profile');
+      if (onProfileUpdated) onProfileUpdated(user);
       if (onToast) onToast(`Welcome back, ${user.name}!`, 'success');
-      executeTwoTierSync(dailyStatsMap);
+      if (user.canCloudSync) {
+        executeTwoTierSync(dailyStatsMap);
+      }
     } catch (err) {
       const msg = err.message || '';
       if (msg.toLowerCase().includes('invalid login credentials') || msg.toLowerCase().includes('invalid')) {
@@ -134,8 +166,11 @@ export function AuthProfileModal({
       const user = await signUpUser(cleanName, cleanEmail, cleanPassword);
       setProfile(user);
       setActiveTab('profile');
+      if (onProfileUpdated) onProfileUpdated(user);
       if (onToast) onToast(`Account created! Welcome, ${user.name}!`, 'success');
-      executeTwoTierSync(dailyStatsMap);
+      if (user.canCloudSync) {
+        executeTwoTierSync(dailyStatsMap);
+      }
     } catch (err) {
       const msg = err.message || '';
       if (msg.toLowerCase().includes('email_address_invalid') || msg.toLowerCase().includes('is invalid')) {
@@ -207,12 +242,16 @@ export function AuthProfileModal({
     }
   };
 
-  const handleSignOut = () => {
-    signOutUser();
+  const handleSignOut = async () => {
+    await signOutUser();
     setProfile(null);
     setActiveTab('signin');
     clearFeedback();
-    if (onToast) onToast('Signed out. Switched to local offline mode.', 'info');
+    if (onSignOut) {
+      onSignOut();
+    }
+    if (onToast) onToast('Signed out. Account sign-in required to continue.', 'info');
+    onClose();
   };
 
   const handleTriggerManualSync = async () => {
@@ -221,7 +260,9 @@ export function AuthProfileModal({
     try {
       const res = await executeTwoTierSync(dailyStatsMap);
       if (res.success) {
-        setProfile(getActiveUserProfile());
+        const refreshed = getActiveUserProfile();
+        setProfile(refreshed);
+        if (onProfileUpdated) onProfileUpdated(refreshed);
         if (onToast) onToast('Cloud sync complete! All data up to date.', 'success');
       } else {
         setErrorMessage(res.error || 'Cloud sync failed.');
@@ -231,12 +272,6 @@ export function AuthProfileModal({
     } finally {
       setSyncing(false);
     }
-  };
-
-  const handleChangeStorageMode = (mode) => {
-    const updated = updateUserProfile({ cloudProvider: mode });
-    setProfile(updated);
-    if (onToast) onToast(`Sync mode updated to ${mode === 'supabase_cloud' ? 'Hammer Pro Cloud' : (mode === 'gdrive' ? 'Google Drive' : 'Local Only')}`, 'info');
   };
 
   return (
@@ -381,99 +416,123 @@ export function AuthProfileModal({
                 </div>
               </div>
 
-              {/* 2 Real Production Storage Options */}
+              {/* Account Entitlements & Storage Details (Admin-Managed) */}
               <div style={{ marginBottom: '1.25rem' }}>
                 <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.65rem' }}>
-                  Backup &amp; Sync Storage Preference
+                  Account Entitlements &amp; Storage
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                  {/* Option 1: Hammer Pro Cloud */}
-                  <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '0.85rem 1rem',
-                    borderRadius: '0.75rem',
-                    border: `1.5px solid ${profile.cloudProvider === 'supabase_cloud' ? 'var(--hero-green)' : 'var(--border-light)'}`,
-                    backgroundColor: profile.cloudProvider === 'supabase_cloud' ? 'rgba(6, 78, 59, 0.04)' : '#ffffff',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                      <input
-                        type="radio"
-                        name="storageMode"
-                        checked={profile.cloudProvider === 'supabase_cloud'}
-                        onChange={() => handleChangeStorageMode('supabase_cloud')}
-                        style={{ accentColor: 'var(--hero-green)' }}
-                      />
-                      <div>
-                        <div style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-main)' }}>⚡ Hammer Pro Cloud Sync</div>
-                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Automatic cross-device sync &amp; Cloudflare R2 storage</div>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.75rem',
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid var(--border-light)',
+                  borderRadius: '0.75rem',
+                  padding: '1rem'
+                }}>
+                  {/* Cloud Sync Status */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+                    <div>
+                      <div style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                        Cloud Sync &amp; Backup
+                      </div>
+                      <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        {profile.canCloudSync
+                          ? 'Automatic cross-device sync & Cloudflare R2 backup enabled'
+                          : '100% offline local storage mode (managed by administrator)'}
                       </div>
                     </div>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--hero-green)', backgroundColor: '#dcfce7', padding: '2px 8px', borderRadius: '999px' }}>
-                      Active
+                    <span style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      padding: '0.2rem 0.65rem',
+                      borderRadius: '999px',
+                      whiteSpace: 'nowrap',
+                      backgroundColor: profile.canCloudSync ? '#dcfce7' : '#f1f5f9',
+                      color: profile.canCloudSync ? 'var(--hero-green)' : '#64748b',
+                      border: `1px solid ${profile.canCloudSync ? '#86efac' : '#cbd5e1'}`
+                    }}>
+                      {profile.canCloudSync ? '⚡ Active' : '💾 Local Only'}
                     </span>
-                  </label>
+                  </div>
 
-                  {/* Option 2: Local Only */}
-                  <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '0.85rem 1rem',
-                    borderRadius: '0.75rem',
-                    border: `1.5px solid ${profile.cloudProvider === 'local_only' ? 'var(--hero-green)' : 'var(--border-light)'}`,
-                    backgroundColor: profile.cloudProvider === 'local_only' ? 'rgba(6, 78, 59, 0.04)' : '#ffffff',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                      <input
-                        type="radio"
-                        name="storageMode"
-                        checked={profile.cloudProvider === 'local_only'}
-                        onChange={() => handleChangeStorageMode('local_only')}
-                        style={{ accentColor: 'var(--hero-green)' }}
-                      />
-                      <div>
-                        <div style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-main)' }}>💾 Local Storage Only</div>
-                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Store 100% of data offline on this device</div>
+                  <div style={{ height: '1px', backgroundColor: 'var(--border-light)' }} />
+
+                  {/* Screenshot Allowance Status */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+                    <div>
+                      <div style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                        Screenshot Sync Limit
+                      </div>
+                      <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        {profile.canCloudSync
+                          ? (profile.dailyImageLimit > 0
+                              ? `Up to ${profile.dailyImageLimit} screenshots per session`
+                              : 'Trade logs only (0 screenshots sync to cloud)')
+                          : 'Local disk only (No cloud uploads)'}
                       </div>
                     </div>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', backgroundColor: '#f1f5f9', padding: '2px 8px', borderRadius: '999px' }}>
-                      Offline
+                    <span style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      padding: '0.2rem 0.65rem',
+                      borderRadius: '999px',
+                      whiteSpace: 'nowrap',
+                      backgroundColor: '#f1f5f9',
+                      color: '#475569',
+                      border: '1px solid #cbd5e1'
+                    }}>
+                      {profile.canCloudSync
+                        ? (profile.dailyImageLimit > 0 ? `${profile.dailyImageLimit} / session` : 'Logs Only')
+                        : 'Local Only'}
                     </span>
-                  </label>
+                  </div>
                 </div>
               </div>
 
-              {/* Sync Actions Bar */}
-              <div style={{
-                backgroundColor: '#f8fafc',
-                border: '1px solid var(--border-light)',
-                borderRadius: '0.75rem',
-                padding: '0.85rem 1rem',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '1.25rem'
-              }}>
-                <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-                  Last synced: {profile.lastSyncTimestamp ? new Date(profile.lastSyncTimestamp).toLocaleTimeString() : 'Just now'}
-                </span>
-                <button
-                  className="btn"
-                  style={{ fontSize: '0.78rem', padding: '0.35rem 0.85rem' }}
-                  onClick={handleTriggerManualSync}
-                  disabled={syncing}
-                >
-                  <RefreshCw size={13} className={syncing ? 'spin-animation' : ''} />
-                  {syncing ? 'Syncing...' : 'Sync Now'}
-                </button>
-              </div>
+              {/* Sync Actions Bar - Only shown if cloud sync is enabled */}
+              {profile.canCloudSync ? (
+                <div style={{
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid var(--border-light)',
+                  borderRadius: '0.75rem',
+                  padding: '0.85rem 1rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '1.25rem'
+                }}>
+                  <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                    Last synced: {profile.lastSyncTimestamp ? new Date(profile.lastSyncTimestamp).toLocaleTimeString() : 'Just now'}
+                  </span>
+                  <button
+                    className="btn"
+                    style={{ fontSize: '0.78rem', padding: '0.35rem 0.85rem' }}
+                    onClick={handleTriggerManualSync}
+                    disabled={syncing}
+                  >
+                    <RefreshCw size={13} className={syncing ? 'spin-animation' : ''} />
+                    {syncing ? 'Syncing...' : 'Sync Now'}
+                  </button>
+                </div>
+              ) : (
+                <div style={{
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid var(--border-light)',
+                  borderRadius: '0.75rem',
+                  padding: '0.75rem 1rem',
+                  marginBottom: '1.25rem',
+                  fontSize: '0.76rem',
+                  color: 'var(--text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981', flexShrink: 0 }} />
+                  <span>All sessions and accounts are saved locally on this machine.</span>
+                </div>
+              )}
 
               {/* Bottom Actions */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-light)', paddingTop: '1rem' }}>
