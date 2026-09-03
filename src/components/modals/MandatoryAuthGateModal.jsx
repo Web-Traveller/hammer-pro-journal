@@ -97,7 +97,7 @@ export function MandatoryAuthGateModal({ isOpen = false, onAuthenticated, onToas
 
     setLoading(true);
     try {
-      const profile = await signUpUser(cleanEmail, cleanPassword, cleanName);
+      const profile = await signUpUser(cleanName, cleanEmail, cleanPassword);
       if (profile) {
         setSuccessMessage('Account created successfully! Loading your journal...');
         if (onToast) onToast(`Account created! Welcome, ${profile.name}`, 'success');

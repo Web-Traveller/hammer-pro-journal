@@ -65,14 +65,16 @@ export function getActiveUserProfile() {
 /**
  * Persist user profile locally
  */
-export function saveActiveUserProfile(profile) {
+export function saveActiveUserProfile(profile, broadcast = true) {
   try {
     if (!profile) {
       localStorage.removeItem(AUTH_STORAGE_KEY);
     } else {
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(profile));
     }
-    notifySyncStatus(profile ? 'synced' : 'local_only', 'Profile updated', { profile });
+    if (broadcast) {
+      notifySyncStatus(profile ? 'synced' : 'local_only', 'Profile updated', { profile });
+    }
   } catch (e) {
     console.error('Error saving user profile:', e);
   }
@@ -80,13 +82,32 @@ export function saveActiveUserProfile(profile) {
 
 /**
  * Sign Up with Live Supabase Auth & Create Profile in user_profiles Table
+ * Supports both (name, email, password) and (email, password, name) call signatures
  */
-export async function signUpUser(name, email, password, options = {}) {
-  if (!email || !password) {
+export async function signUpUser(arg1, arg2, arg3, options = {}) {
+  let cleanName = '';
+  let cleanEmail = '';
+  let password = '';
+
+  // Detect signature: if arg1 has '@', it's (email, password, name)
+  if (typeof arg1 === 'string' && arg1.includes('@')) {
+    cleanEmail = arg1.trim().toLowerCase();
+    password = arg2 ? String(arg2) : '';
+    cleanName = (arg3 ? String(arg3) : cleanEmail.split('@')[0]).trim();
+  } else {
+    cleanName = arg1 ? String(arg1).trim() : '';
+    cleanEmail = arg2 ? String(arg2).trim().toLowerCase() : '';
+    password = arg3 ? String(arg3) : '';
+  }
+
+  if (!cleanName && cleanEmail.includes('@')) {
+    cleanName = cleanEmail.split('@')[0];
+  }
+
+  if (!cleanEmail || !password) {
     throw new Error('Email and password are required.');
   }
 
-  const cleanEmail = email.trim().toLowerCase();
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(cleanEmail)) {
     throw new Error('Please enter a valid email address.');
@@ -94,8 +115,6 @@ export async function signUpUser(name, email, password, options = {}) {
   if (password.length < 6) {
     throw new Error('Password must be at least 6 characters.');
   }
-
-  const cleanName = (name || cleanEmail.split('@')[0]).trim();
 
   // 1. Live Supabase Auth SignUp
   const { data, error } = await supabase.auth.signUp({
@@ -272,17 +291,28 @@ export async function refreshUserProfile() {
       .maybeSingle();
 
     if (!error && dbProfile) {
-      const updated = {
-        ...current,
-        name: dbProfile.name || current.name,
-        planTier: dbProfile.plan_tier || current.planTier,
-        canCloudSync: dbProfile.can_cloud_sync ?? false,
-        dailyImageLimit: dbProfile.daily_image_limit ?? 0,
-        isBlocked: dbProfile.is_blocked ?? false,
-        avatarUrl: dbProfile.avatar_url || current.avatarUrl
-      };
-      saveActiveUserProfile(updated);
-      return updated;
+      const hasChanges = (
+        current.canCloudSync !== (dbProfile.can_cloud_sync ?? false) ||
+        current.dailyImageLimit !== (dbProfile.daily_image_limit ?? 0) ||
+        current.planTier !== (dbProfile.plan_tier || 'free') ||
+        current.isBlocked !== (dbProfile.is_blocked ?? false) ||
+        current.name !== (dbProfile.name || current.name) ||
+        current.avatarUrl !== (dbProfile.avatar_url || current.avatarUrl)
+      );
+
+      if (hasChanges) {
+        const updated = {
+          ...current,
+          name: dbProfile.name || current.name,
+          planTier: dbProfile.plan_tier || current.planTier,
+          canCloudSync: dbProfile.can_cloud_sync ?? false,
+          dailyImageLimit: dbProfile.daily_image_limit ?? 0,
+          isBlocked: dbProfile.is_blocked ?? false,
+          avatarUrl: dbProfile.avatar_url || current.avatarUrl
+        };
+        saveActiveUserProfile(updated, false);
+        return updated;
+      }
     }
   } catch (e) {
     console.warn('refreshUserProfile note:', e);
@@ -310,6 +340,10 @@ export async function fetchOnDemandSessionLog(sessionDate) {
   return null;
 }
 
+// Mutex lock and throttling for sync execution
+let isSyncRunning = false;
+let lastSyncExecutionTime = 0;
+
 /**
  * Two-Way Full Sync (Cloudflare R2 + Supabase)
  * 1. PUSH: Iterates over ALL local logs, uploads heavy .txt files & screenshots to R2,
@@ -329,6 +363,21 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}) {
     notifySyncStatus('local_only', 'Cloud Sync is not enabled for your account. Working in Local Storage mode.');
     return { success: false, mode: 'local', error: 'Cloud Sync is disabled for your account. Contact the administrator to enable cloud sync.' };
   }
+
+  // Mutex Lock: Prevent concurrent syncs
+  if (isSyncRunning) {
+    console.log('[Sync] Synchronization already in progress. Skipping duplicate call.');
+    return { success: false, inProgress: true };
+  }
+
+  // Rate Limiting: Minimum 4 seconds cooldown between background sync runs unless explicitly forced
+  const now = Date.now();
+  if (!options.force && (now - lastSyncExecutionTime < 4000)) {
+    return { success: true, throttled: true };
+  }
+
+  isSyncRunning = true;
+  lastSyncExecutionTime = now;
 
   try {
     const settings = (await loadSettingsFromStorage()) || {};
@@ -360,7 +409,7 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}) {
       // FAST PATH: If remote hash matches local fingerprint and we have logs, skip all R2 requests!
       if (!options.explicitLogs && remoteHash && remoteHash === localFingerprint && localDates.length > 0) {
         profile.lastSyncTimestamp = Date.now();
-        saveActiveUserProfile(profile);
+        saveActiveUserProfile(profile, false);
         notifySyncStatus('synced', 'All sessions synced across devices!', {
           profile,
           syncedLogs: allLocalLogs,
@@ -544,7 +593,7 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}) {
       } catch (e) {}
 
       profile.lastSyncTimestamp = Date.now();
-      saveActiveUserProfile(profile);
+      saveActiveUserProfile(profile, false);
       notifySyncStatus('synced', 'All sessions synced across devices!', {
         profile,
         syncedLogs: updatedLocalLogs,
@@ -565,6 +614,8 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}) {
     console.error('Two-tier sync error:', err);
     notifySyncStatus('error', err.message || 'Sync encountered an error.');
     return { success: false, error: err.message };
+  } finally {
+    isSyncRunning = false;
   }
 }
 

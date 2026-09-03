@@ -53,18 +53,20 @@ export function AuthProfileModal({
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Keep state synchronized whenever modal is opened or userProfile changes
+  const wasOpenRef = React.useRef(false);
+
+  // Keep state synchronized ONLY when modal transitions from closed to open
   React.useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !wasOpenRef.current) {
+      wasOpenRef.current = true;
       const active = userProfile || getActiveUserProfile();
       setProfile(active);
       if (active && active.id) {
         setActiveTab('profile');
-        // Refresh latest admin permissions & limits from Supabase user_profiles
+        // Refresh latest admin permissions once silently on open
         refreshUserProfile().then((refreshed) => {
           if (refreshed && refreshed.id) {
             setProfile(refreshed);
-            if (onProfileUpdated) onProfileUpdated(refreshed);
           }
         }).catch(() => {});
       } else {
@@ -72,8 +74,10 @@ export function AuthProfileModal({
       }
       setErrorMessage('');
       setSuccessMessage('');
+    } else if (!isOpen) {
+      wasOpenRef.current = false;
     }
-  }, [isOpen, userProfile]);
+  }, [isOpen]);
 
   // Listen for Supabase password recovery event
   React.useEffect(() => {
@@ -120,9 +124,6 @@ export function AuthProfileModal({
       setActiveTab('profile');
       if (onProfileUpdated) onProfileUpdated(user);
       if (onToast) onToast(`Welcome back, ${user.name}!`, 'success');
-      if (user.canCloudSync) {
-        executeTwoTierSync(dailyStatsMap);
-      }
     } catch (err) {
       const msg = err.message || '';
       if (msg.toLowerCase().includes('invalid login credentials') || msg.toLowerCase().includes('invalid')) {
@@ -168,9 +169,6 @@ export function AuthProfileModal({
       setActiveTab('profile');
       if (onProfileUpdated) onProfileUpdated(user);
       if (onToast) onToast(`Account created! Welcome, ${user.name}!`, 'success');
-      if (user.canCloudSync) {
-        executeTwoTierSync(dailyStatsMap);
-      }
     } catch (err) {
       const msg = err.message || '';
       if (msg.toLowerCase().includes('email_address_invalid') || msg.toLowerCase().includes('is invalid')) {

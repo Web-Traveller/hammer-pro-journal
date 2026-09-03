@@ -121,7 +121,7 @@ export function useTradingState() {
   const handleAuthenticatedUser = useCallback((profile) => {
     setUserProfile(profile);
     if (profile && profile.canCloudSync === true) {
-      executeTwoTierSync();
+      executeTwoTierSync({}, { force: true });
     }
   }, []);
 
@@ -252,7 +252,23 @@ export function useTradingState() {
     const unsubscribe = subscribeSyncStatus((statusPayload) => {
       setSyncState(statusPayload);
       if (statusPayload.profile !== undefined) {
-        setUserProfile(statusPayload.profile);
+        setUserProfile(prev => {
+          if (!prev && !statusPayload.profile) return null;
+          if (!prev || !statusPayload.profile) return statusPayload.profile;
+          if (
+            prev.id === statusPayload.profile.id &&
+            prev.canCloudSync === statusPayload.profile.canCloudSync &&
+            prev.dailyImageLimit === statusPayload.profile.dailyImageLimit &&
+            prev.planTier === statusPayload.profile.planTier &&
+            prev.isBlocked === statusPayload.profile.isBlocked &&
+            prev.name === statusPayload.profile.name &&
+            prev.email === statusPayload.profile.email &&
+            prev.avatarUrl === statusPayload.profile.avatarUrl
+          ) {
+            return prev;
+          }
+          return statusPayload.profile;
+        });
       }
       if (statusPayload.syncedLogs && Object.keys(statusPayload.syncedLogs).length > 0) {
         setLogs(prev => ({ ...prev, ...statusPayload.syncedLogs }));
