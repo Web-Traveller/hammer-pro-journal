@@ -31,24 +31,56 @@ export async function safeTauriInvoke(cmd, args = {}) {
 /**
  * Automated Session Revision Backup Engine
  * Whenever a log file or session is edited or overwritten, creates an automatic
- * timestamped revision backup (e.g. trading_log_rev_2026-08-18_1724123456789)
- * and purges revisions older than 14 days to preserve space.
+ * timestamped revision backup on Tauri disk (logs/revisions) or safe trimmed fallback in web,
+ * and purges revisions older than 14 days to preserve disk & quota.
  */
-export async function saveLogRevisionBackup(date, previousContent) {
+export async function saveLogRevisionBackup(date, previousContent, accountId = 'default') {
   if (!date || !previousContent || typeof previousContent !== 'string') return;
   const cleanDate = date.trim();
   const timestamp = Date.now();
-  const revKey = `trading_log_rev_${cleanDate}_${timestamp}`;
 
+  // In desktop Tauri, write directly to logs/revisions on disk
+  if (isTauriEnvironment()) {
+    try {
+      await safeTauriInvoke("save_log_revision", {
+        date: cleanDate,
+        content: previousContent,
+        accountId,
+        timestamp
+      });
+      console.log(`[Revision System] Saved disk revision for ${cleanDate} (${accountId})`);
+      return;
+    } catch (e) {
+      console.warn("[Revision System] Tauri save_log_revision fallback:", e);
+    }
+  }
+
+  // Fallback for non-Tauri / Web preview: Avoid QuotaExceededError by capping size (< 50KB)
+  const revKey = `trading_log_rev_${cleanDate}_${timestamp}`;
   try {
-    localStorage.setItem(revKey, previousContent);
-    console.log(`[Revision System] Saved backup revision for ${cleanDate}: ${revKey}`);
+    if (previousContent.length < 50000) {
+      localStorage.setItem(revKey, previousContent);
+    }
   } catch (e) {
     console.warn("[Revision System] Backup save warning:", e);
   }
 }
 
-export function cleanExpiredBackupRevisions(maxDays = 14) {
+export async function cleanExpiredBackupRevisions(maxDays = 14, accountId = 'default') {
+  if (isTauriEnvironment()) {
+    try {
+      const purged = await safeTauriInvoke("clean_log_revisions", {
+        accountId,
+        maxAgeDays: maxDays
+      });
+      if (purged) {
+        console.log(`[Revision System] Purged ${purged} disk revisions older than ${maxDays} days.`);
+      }
+    } catch (e) {
+      console.warn("[Revision System] Tauri clean_log_revisions fallback:", e);
+    }
+  }
+
   try {
     const maxAgeMs = maxDays * 24 * 60 * 60 * 1000;
     const now = Date.now();
@@ -56,7 +88,7 @@ export function cleanExpiredBackupRevisions(maxDays = 14) {
 
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith('trading_log_rev_')) {
+      if (key && (key.startsWith('trading_log_rev_') || key.startsWith('trading_log_deleted_archived_'))) {
         const parts = key.split('_');
         const tsStr = parts[parts.length - 1];
         const ts = parseInt(tsStr, 10);
@@ -68,7 +100,7 @@ export function cleanExpiredBackupRevisions(maxDays = 14) {
 
     keysToRemove.forEach(k => localStorage.removeItem(k));
     if (keysToRemove.length > 0) {
-      console.log(`[Revision System] Purged ${keysToRemove.length} expired revision backups older than ${maxDays} days.`);
+      console.log(`[Revision System] Purged ${keysToRemove.length} expired localStorage revision backups.`);
     }
   } catch (e) {
     console.warn("[Revision System] Auto-purge error:", e);
@@ -98,7 +130,7 @@ export function getDeletedSessionsTombstones() {
   }
 }
 
-export function markSessionAsDeleted(date, previousContent = null) {
+export function markSessionAsDeleted(date, previousContent = null, accountId = 'default') {
   if (!date) return;
   const cleanDate = date.trim();
   const now = Date.now();
@@ -107,14 +139,13 @@ export function markSessionAsDeleted(date, previousContent = null) {
   const tombstones = getDeletedSessionsTombstones();
   tombstones[cleanDate] = {
     deletedAt: now,
-    expiresAt,
-    archivedContent: previousContent || null
+    expiresAt
   };
 
   try {
     localStorage.setItem(DELETED_SESSIONS_STORAGE_KEY, JSON.stringify(tombstones));
     if (previousContent) {
-      localStorage.setItem(`trading_log_deleted_archived_${cleanDate}_${now}`, previousContent);
+      saveLogRevisionBackup(cleanDate, previousContent, accountId);
     }
   } catch (e) {
     console.warn("Error marking session as deleted tombstone:", e);
@@ -163,7 +194,7 @@ export async function persistLog(date, content, accountId = 'default') {
   try {
     const existing = localStorage.getItem(logKey);
     if (existing && existing !== content) {
-      await saveLogRevisionBackup(cleanDate, existing);
+      await saveLogRevisionBackup(cleanDate, existing, accountId);
     }
   } catch (e) {}
 

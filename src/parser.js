@@ -393,19 +393,24 @@ export function matchTradesFIFOWithOpenPos(executions) {
                     const first = pos.inventory[0];
                     const matchQty = Math.min(remainingQty, first.qty);
 
+                    // Integer-cents quantization to eliminate IEEE 754 floating-point drift
                     let tradePnl = 0;
                     if (pos.side === 'B') {
-                        tradePnl = (exec.execPrice - first.price) * matchQty;
+                        tradePnl = Math.round(((exec.execPrice * 100) - (first.price * 100)) * matchQty) / 100;
                     } else {
-                        tradePnl = (first.price - exec.execPrice) * matchQty;
+                        tradePnl = Math.round(((first.price * 100) - (exec.execPrice * 100)) * matchQty) / 100;
                     }
 
                     const entryTime = first.time;
                     const exitTime = execTime;
                     const holdingSeconds = Math.max(0, (exitTime.getTime() - entryTime.getTime()) / 1000);
 
+                    // Deterministic trade ID ensures idempotent parses and stable UI keys across reloads/devices
+                    const tradeIdx = completedTrades.length;
+                    const deterministicId = `tr_${symbol}_${pos.side}_${entryTime.getTime()}_${exitTime.getTime()}_${Math.round(first.price * 10000)}_${Math.round(exec.execPrice * 10000)}_${matchQty}_${tradeIdx}`;
+
                     completedTrades.push({
-                        id: Math.random().toString(36).substring(2, 9),
+                        id: deterministicId,
                         symbol: symbol,
                         side: pos.side,
                         qty: matchQty,
@@ -1433,27 +1438,21 @@ export async function fetchStockMarketData(symbol, forceRefresh = false) {
     };
 
     try {
-        const targetUrl = `https://finviz.com/quote.ashx?t=${sym}`;
-        const urlsToTry = [
-            `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
-            `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
-            targetUrl
-        ];
-
+        const targetUrl = `https://finviz.com/quote.ashx?t=${encodeURIComponent(sym)}`;
         let htmlText = '';
-        for (const url of urlsToTry) {
-            try {
-                const res = await fetch(url);
-                if (res.ok) {
-                    const text = await res.text();
-                    if (text && (text.includes('snapshot-td') || text.includes('snapshot-table') || text.includes('quote-header'))) {
-                        htmlText = text;
-                        break;
-                    }
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 4000);
+            const res = await fetch(targetUrl, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (res.ok) {
+                const text = await res.text();
+                if (text && (text.includes('snapshot-td') || text.includes('snapshot-table') || text.includes('quote-header'))) {
+                    htmlText = text;
                 }
-            } catch (err) {
-                // Try next endpoint
             }
+        } catch (err) {
+            // Direct fetch unavailable or blocked by CORS, gracefully preserve safe default metadata
         }
 
         if (htmlText) {

@@ -3,11 +3,25 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::Manager;
 
-fn sanitize_input(input: &str) -> String {
+fn sanitize_segment(input: &str) -> String {
     input
         .chars()
-        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_' || *c == '.')
+        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
         .collect()
+}
+
+fn sanitize_filename(input: &str) -> String {
+    let path = Path::new(input);
+    let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
+    let clean: String = file_name
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_' || *c == '.')
+        .collect();
+
+    if clean.contains("..") || clean.starts_with('.') || clean.is_empty() {
+        return "unnamed_file".to_string();
+    }
+    clean
 }
 
 fn get_account_logs_dir(app_handle: &tauri::AppHandle, account_id: Option<String>) -> Result<PathBuf, String> {
@@ -16,7 +30,7 @@ fn get_account_logs_dir(app_handle: &tauri::AppHandle, account_id: Option<String
 
     match account_id {
         Some(id) => {
-            let clean_id = sanitize_input(&id);
+            let clean_id = sanitize_segment(&id);
             if clean_id.is_empty() || clean_id == "default" {
                 Ok(base_logs_dir)
             } else {
@@ -29,7 +43,7 @@ fn get_account_logs_dir(app_handle: &tauri::AppHandle, account_id: Option<String
 
 #[tauri::command]
 fn save_log(app_handle: tauri::AppHandle, date: String, content: String, account_id: Option<String>) -> Result<(), String> {
-    let clean_date = sanitize_input(&date);
+    let clean_date = sanitize_segment(&date);
     if clean_date.is_empty() {
         return Err("Invalid date parameter".to_string());
     }
@@ -37,20 +51,90 @@ fn save_log(app_handle: tauri::AppHandle, date: String, content: String, account
     fs::create_dir_all(&logs_dir).map_err(|e| e.to_string())?;
     let file_path = logs_dir.join(format!("{}.txt", clean_date));
 
-    // If file already exists and is being edited, preserve a timestamped backup copy on disk
+    // If file already exists and is being edited, preserve a timestamped revision copy on disk
     if file_path.exists() {
-        let backups_dir = logs_dir.join("backups");
-        let _ = fs::create_dir_all(&backups_dir);
+        let revisions_dir = logs_dir.join("revisions");
+        let _ = fs::create_dir_all(&revisions_dir);
         let now_ts = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis())
             .unwrap_or(0);
-        let backup_path = backups_dir.join(format!("{}_{}.txt", clean_date, now_ts));
+        let backup_path = revisions_dir.join(format!("{}_{}.txt", clean_date, now_ts));
         let _ = fs::copy(&file_path, backup_path);
     }
 
     fs::write(file_path, content).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[tauri::command]
+fn save_log_revision(
+    app_handle: tauri::AppHandle,
+    date: String,
+    content: String,
+    account_id: Option<String>,
+    timestamp: Option<u64>,
+) -> Result<String, String> {
+    let clean_date = sanitize_segment(&date);
+    if clean_date.is_empty() {
+        return Err("Invalid date parameter".to_string());
+    }
+    let logs_dir = get_account_logs_dir(&app_handle, account_id)?;
+    let revisions_dir = logs_dir.join("revisions");
+    fs::create_dir_all(&revisions_dir).map_err(|e| e.to_string())?;
+
+    let ts = timestamp.unwrap_or_else(|| {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0)
+    });
+
+    let filename = format!("{}_{}.txt", clean_date, ts);
+    let file_path = revisions_dir.join(&filename);
+    fs::write(&file_path, content).map_err(|e| e.to_string())?;
+    Ok(filename)
+}
+
+#[tauri::command]
+fn clean_log_revisions(
+    app_handle: tauri::AppHandle,
+    account_id: Option<String>,
+    max_age_days: Option<u64>,
+) -> Result<usize, String> {
+    let logs_dir = get_account_logs_dir(&app_handle, account_id)?;
+    let revisions_dir = logs_dir.join("revisions");
+    if !revisions_dir.exists() {
+        return Ok(0);
+    }
+
+    let days = max_age_days.unwrap_or(30);
+    let max_age_ms = days * 24 * 60 * 60 * 1000;
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+
+    let mut deleted_count = 0;
+    if let Ok(entries) = fs::read_dir(&revisions_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() && path.extension().map_or(false, |e| e == "txt") {
+                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                    if let Some(pos) = stem.rfind('_') {
+                        if let Ok(ts) = stem[pos + 1..].parse::<u64>() {
+                            if now_ms > ts && (now_ms - ts) > max_age_ms {
+                                if fs::remove_file(&path).is_ok() {
+                                    deleted_count += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(deleted_count)
 }
 
 #[tauri::command]
@@ -77,7 +161,7 @@ fn load_all_logs(app_handle: tauri::AppHandle, account_id: Option<String>) -> Re
 
 #[tauri::command]
 fn delete_log(app_handle: tauri::AppHandle, date: String, account_id: Option<String>) -> Result<(), String> {
-    let clean_date = sanitize_input(&date);
+    let clean_date = sanitize_segment(&date);
     if clean_date.is_empty() {
         return Ok(());
     }
@@ -113,8 +197,8 @@ fn get_log_dir(app_handle: tauri::AppHandle, account_id: Option<String>) -> Resu
 
 #[tauri::command]
 fn save_screenshot(app_handle: tauri::AppHandle, date: String, filename: String, data_url: String, account_id: Option<String>) -> Result<(), String> {
-    let clean_date = sanitize_input(&date);
-    let clean_filename = sanitize_input(&filename);
+    let clean_date = sanitize_segment(&date);
+    let clean_filename = sanitize_filename(&filename);
     if clean_date.is_empty() || clean_filename.is_empty() {
         return Err("Invalid date or filename parameter".to_string());
     }
@@ -134,7 +218,7 @@ fn save_screenshot(app_handle: tauri::AppHandle, date: String, filename: String,
 
 #[tauri::command]
 fn load_session_screenshots(app_handle: tauri::AppHandle, date: String, account_id: Option<String>) -> Result<Vec<HashMap<String, String>>, String> {
-    let clean_date = sanitize_input(&date);
+    let clean_date = sanitize_segment(&date);
     let logs_dir = get_account_logs_dir(&app_handle, account_id)?;
     let mut screenshots = Vec::new();
     let prefix = format!("{}_img_", clean_date);
@@ -164,7 +248,7 @@ fn load_session_screenshots(app_handle: tauri::AppHandle, date: String, account_
 
 #[tauri::command]
 fn delete_screenshot(app_handle: tauri::AppHandle, filename: String, account_id: Option<String>) -> Result<(), String> {
-    let clean_filename = sanitize_input(&filename);
+    let clean_filename = sanitize_filename(&filename);
     if clean_filename.is_empty() {
         return Ok(());
     }
@@ -198,13 +282,20 @@ fn load_accounts_config(app_handle: tauri::AppHandle) -> Result<String, String> 
 
 #[tauri::command]
 fn sync_local_directory(app_handle: tauri::AppHandle, target_dir: String) -> Result<(), String> {
-    if target_dir.trim().is_empty() {
+    let trimmed = target_dir.trim();
+    if trimmed.is_empty() {
         return Ok(());
     }
-    let dest_path = Path::new(&target_dir);
+    let dest_path = Path::new(trimmed);
     if !dest_path.is_absolute() {
         return Err("Target directory must be an absolute path".to_string());
     }
+
+    // Disallow sync to root filesystem paths
+    if dest_path == Path::new("/") || dest_path == Path::new("C:\\") || dest_path == Path::new("C:/") {
+        return Err("Cannot sync to root filesystem path".to_string());
+    }
+
     let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
     let logs_dir = app_dir.join("logs");
     if !logs_dir.exists() {
@@ -232,6 +323,8 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             save_log,
+            save_log_revision,
+            clean_log_revisions,
             load_all_logs,
             delete_log,
             get_log_dir,
@@ -245,4 +338,3 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
-

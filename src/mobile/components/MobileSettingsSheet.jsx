@@ -7,7 +7,8 @@ import {
   ShieldCheck,
   DollarSign,
   Calendar,
-  LogOut
+  LogOut,
+  Wallet
 } from 'lucide-react';
 import { signOutUser } from '../../services/authService';
 
@@ -21,7 +22,11 @@ export function MobileSettingsSheet({
   timezone,
   onTimezoneChange,
   settings = {},
-  onSaveSettings
+  onSaveSettings,
+  accounts = [],
+  activeAccountId = 'default',
+  onSwitchAccount,
+  onOpenAccountsModal
 }) {
   if (!isOpen) return null;
 
@@ -138,6 +143,84 @@ export function MobileSettingsSheet({
           <RefreshCw size={18} className={isSyncing ? 'anim-spin' : ''} />
           {isSyncing ? 'Syncing with Cloudflare R2...' : 'Sync Cloud Trades Now'}
         </button>
+
+        {/* TRADING ACCOUNTS SELECTOR */}
+        {accounts && accounts.length > 0 && (
+          <div
+            style={{
+              backgroundColor: '#f8fafc',
+              border: '1px solid var(--border-light, #e5e7eb)',
+              borderRadius: '0.85rem',
+              padding: '0.85rem 1rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.65rem'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Wallet size={16} color="#6b7280" />
+                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>Trading Account</span>
+              </div>
+              {onOpenAccountsModal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenAccountsModal();
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#059669',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    padding: 0
+                  }}
+                >
+                  Manage
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+              {accounts.map(acc => {
+                const isActive = acc.id === activeAccountId;
+                return (
+                  <button
+                    key={acc.id}
+                    type="button"
+                    onClick={() => onSwitchAccount && onSwitchAccount(acc.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '0.35rem 0.65rem',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      border: isActive ? '1.5px solid #059669' : '1px solid #e2e8f0',
+                      backgroundColor: isActive ? '#ecfdf5' : '#ffffff',
+                      color: isActive ? '#065f46' : '#334155',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '7px',
+                        height: '7px',
+                        borderRadius: '50%',
+                        backgroundColor: acc.color || '#10b981'
+                      }}
+                    />
+                    <span>{acc.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* TIMEZONE SELECTOR */}
         <div

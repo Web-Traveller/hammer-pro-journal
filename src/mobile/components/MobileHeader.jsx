@@ -7,7 +7,9 @@ export function MobileHeader({
   userProfile,
   onOpenProfile,
   syncState = {},
-  onSyncNow
+  onSyncNow,
+  activeAccount,
+  onOpenAccountsModal
 }) {
   const isSyncing = syncState.status === 'syncing';
   const isSynced = syncState.status === 'synced';
@@ -20,6 +22,30 @@ export function MobileHeader({
       </div>
 
       <div className="mobile-top-actions">
+        {/* Active Trading Account Pill */}
+        {onOpenAccountsModal && (
+          <button
+            className="mobile-pill-btn"
+            onClick={onOpenAccountsModal}
+            type="button"
+            title="Switch Trading Account"
+            style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
+          >
+            <div
+              style={{
+                width: '7px',
+                height: '7px',
+                borderRadius: '50%',
+                backgroundColor: activeAccount?.color || '#10b981',
+                flexShrink: 0
+              }}
+            />
+            <span style={{ maxWidth: '68px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 700 }}>
+              {activeAccount?.name || 'Main'}
+            </span>
+          </button>
+        )}
+
         {/* 1-Tap Cloud Sync Button */}
         <button
           className="mobile-pill-btn"

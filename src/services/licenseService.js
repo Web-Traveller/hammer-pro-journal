@@ -10,17 +10,23 @@ const LICENSE_CACHE_KEY = 'hammer_license_status';
 
 /**
  * Generate a unique hardware/device fingerprint
+ * Stabilized against external monitors and resolution changes
  */
 export async function getDeviceFingerprint() {
   const nav = typeof window !== 'undefined' ? window.navigator : {};
-  const screen = typeof window !== 'undefined' ? window.screen : {};
-  
+  let persistentDeviceUuid = '';
+  try {
+    persistentDeviceUuid = localStorage.getItem('hammer_device_uuid_v1');
+    if (!persistentDeviceUuid) {
+      persistentDeviceUuid = 'dev_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+      localStorage.setItem('hammer_device_uuid_v1', persistentDeviceUuid);
+    }
+  } catch (e) {}
+
   const rawId = [
-    nav.userAgent || '',
+    persistentDeviceUuid,
+    nav.platform || '',
     nav.language || '',
-    screen.width || 0,
-    screen.height || 0,
-    screen.colorDepth || 0,
     nav.hardwareConcurrency || 1
   ].join('###');
 

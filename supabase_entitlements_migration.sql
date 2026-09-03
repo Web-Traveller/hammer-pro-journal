@@ -72,6 +72,47 @@ CREATE POLICY "Allow app_config read access"
     TO authenticated, anon
     USING (true);
 
+-- 4. HARDENED TRIGGER: PREVENT CLIENT-SIDE PRIVILEGE ESCALATION
+-- Even if an authenticated user attempts to update can_cloud_sync, daily_image_limit,
+-- plan_tier, or is_blocked from DevTools / curl, this trigger guarantees that those fields
+-- cannot be changed by regular authenticated clients, reverting them to their database values!
+CREATE OR REPLACE FUNCTION public.protect_user_profile_entitlements()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- If not service_role (i.e. regular authenticated user from client), revert entitlement fields
+  IF (auth.jwt() ->> 'role') != 'service_role' THEN
+    NEW.can_cloud_sync := OLD.can_cloud_sync;
+    NEW.daily_image_limit := OLD.daily_image_limit;
+    NEW.is_blocked := OLD.is_blocked;
+    NEW.plan_tier := OLD.plan_tier;
+  END IF;
+  NEW.updated_at := NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_protect_user_profile_entitlements ON public.user_profiles;
+CREATE TRIGGER trg_protect_user_profile_entitlements
+  BEFORE UPDATE ON public.user_profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.protect_user_profile_entitlements();
+
+-- 5. Seed R2 Dynamic Configuration in app_config
+-- Allows rotating or updating R2 storage credentials anytime without rebuilding client binaries!
+INSERT INTO public.app_config (key, value, updated_at)
+VALUES (
+  'r2_config',
+  jsonb_build_object(
+    'accountId', '76cdb43cd04ce3235b092defe0eeaeac',
+    'bucket', 'hammer-pro-journal',
+    'accessKeyId', '46884316eff299e9e1fec432790e90f8',
+    'secretAccessKey', '94b0fe9a0d1e4cbeea0c65722adfc9cea7bf2fae35a4547822d7697adf0e16b5'
+  ),
+  NOW()
+)
+ON CONFLICT (key) DO UPDATE
+SET value = EXCLUDED.value, updated_at = NOW();
+
 -- ==============================================================================
 -- ADMIN INSTRUCTIONS:
 -- To enable Cloud Sync for a specific user:

@@ -27,7 +27,12 @@ export function MobileApp({
   settings,
   onSaveSettings,
   activeBroadcast,
-  onDismissBroadcast
+  onDismissBroadcast,
+  accounts = [],
+  activeAccountId = 'default',
+  activeAccount = null,
+  onSwitchAccount,
+  onOpenAccountsModal
 }) {
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'session' | 'heatmap'
   const [showSettingsSheet, setShowSettingsSheet] = useState(false);
@@ -53,6 +58,8 @@ export function MobileApp({
         onOpenProfile={() => setShowSettingsSheet(true)}
         syncState={syncState}
         onSyncNow={handleSyncNow}
+        activeAccount={activeAccount}
+        onOpenAccountsModal={onOpenAccountsModal}
       />
 
       {/* Global Admin Broadcast Banner */}
@@ -143,6 +150,10 @@ export function MobileApp({
         onTimezoneChange={onTimezoneChange}
         settings={settings}
         onSaveSettings={onSaveSettings}
+        accounts={accounts}
+        activeAccountId={activeAccountId}
+        onSwitchAccount={onSwitchAccount}
+        onOpenAccountsModal={onOpenAccountsModal}
       />
     </div>
   );

@@ -119,6 +119,11 @@ export default function App() {
           onSaveSettings={state.handleSaveSettings}
           activeBroadcast={state.activeBroadcast}
           onDismissBroadcast={state.handleDismissBroadcast}
+          accounts={state.accounts}
+          activeAccountId={state.activeAccountId}
+          activeAccount={state.activeAccount}
+          onSwitchAccount={state.handleSwitchAccount}
+          onOpenAccountsModal={() => state.setShowAccountsModal(true)}
         />
 
         {/* Global Auth Modal */}

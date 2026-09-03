@@ -8,13 +8,34 @@
  */
 
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { fetchAppConfig } from './supabaseClient';
 
-export const R2_ACCOUNT_ID = '76cdb43cd04ce3235b092defe0eeaeac';
-export const R2_BUCKET = 'hammer-pro-journal';
-export const R2_ENDPOINT = `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
+export let R2_ACCOUNT_ID = '76cdb43cd04ce3235b092defe0eeaeac';
+export let R2_BUCKET = 'hammer-pro-journal';
+export let R2_ENDPOINT = `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
 
-export const R2_ACCESS_KEY_ID = '46884316eff299e9e1fec432790e90f8';
-export const R2_SECRET_ACCESS_KEY = '94b0fe9a0d1e4cbeea0c65722adfc9cea7bf2fae35a4547822d7697adf0e16b5';
+export let R2_ACCESS_KEY_ID = '46884316eff299e9e1fec432790e90f8';
+export let R2_SECRET_ACCESS_KEY = '94b0fe9a0d1e4cbeea0c65722adfc9cea7bf2fae35a4547822d7697adf0e16b5';
+
+let r2ConfigLoaded = false;
+export async function ensureR2Config() {
+  if (r2ConfigLoaded) return;
+  try {
+    const config = await fetchAppConfig('r2_config');
+    if (config) {
+      if (config.accountId) {
+        R2_ACCOUNT_ID = config.accountId;
+        R2_ENDPOINT = `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
+      }
+      if (config.bucket) R2_BUCKET = config.bucket;
+      if (config.accessKeyId) R2_ACCESS_KEY_ID = config.accessKeyId;
+      if (config.secretAccessKey) R2_SECRET_ACCESS_KEY = config.secretAccessKey;
+    }
+  } catch (e) {
+    console.warn('[R2] Dynamic config resolution note:', e);
+  }
+  r2ConfigLoaded = true;
+}
 
 function getR2Client() {
   return new S3Client({
@@ -32,6 +53,7 @@ function getR2Client() {
  */
 export async function uploadMasterSnapshot(userId, snapshotData) {
   if (!userId || !snapshotData) return null;
+  await ensureR2Config();
   const key = `users/${userId}/journal_snapshot.json`;
 
   try {
@@ -58,6 +80,7 @@ export async function uploadMasterSnapshot(userId, snapshotData) {
  */
 export async function downloadMasterSnapshot(userId) {
   if (!userId) return null;
+  await ensureR2Config();
   const key = `users/${userId}/journal_snapshot.json`;
 
   try {
@@ -82,6 +105,7 @@ export async function downloadMasterSnapshot(userId) {
  */
 export async function uploadRawLogToCloud(userId, sessionDate, rawLogContent) {
   if (!userId || !sessionDate || !rawLogContent) return null;
+  await ensureR2Config();
   const key = `users/${userId}/logs/${sessionDate}.txt`;
 
   try {
@@ -107,6 +131,7 @@ export async function uploadRawLogToCloud(userId, sessionDate, rawLogContent) {
  */
 export async function downloadRawLogFromCloud(userId, sessionDate) {
   if (!userId || !sessionDate) return null;
+  await ensureR2Config();
   const key = `users/${userId}/logs/${sessionDate}.txt`;
 
   try {
@@ -130,6 +155,7 @@ export async function downloadRawLogFromCloud(userId, sessionDate) {
  */
 export async function deleteRawLogFromCloud(userId, sessionDate) {
   if (!userId || !sessionDate) return false;
+  await ensureR2Config();
   const key = `users/${userId}/logs/${sessionDate}.txt`;
 
   try {
@@ -152,6 +178,7 @@ export async function deleteRawLogFromCloud(userId, sessionDate) {
  */
 export async function uploadScreenshotToCloud(userId, sessionDate, filename, dataUrl) {
   if (!userId || !sessionDate || !dataUrl) return null;
+  await ensureR2Config();
   const cleanFilename = filename.endsWith('.jpg') || filename.endsWith('.png') ? filename : `${filename}.jpg`;
   const key = `users/${userId}/screenshots/${sessionDate}/${cleanFilename}`;
 
@@ -182,6 +209,7 @@ export async function uploadScreenshotToCloud(userId, sessionDate, filename, dat
  */
 export async function downloadScreenshotFromCloud(key) {
   if (!key) return null;
+  await ensureR2Config();
 
   try {
     const client = getR2Client();
