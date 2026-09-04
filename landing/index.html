@@ -173,12 +173,12 @@
     ===================================================== */
 
     .hero {
-      padding: 85px 0 60px;
+      padding: 95px 0 85px;
       text-align: center;
     }
 
     .hero-container {
-      max-width: 1040px;
+      max-width: 960px;
       margin: 0 auto;
       display: flex;
       flex-direction: column;
@@ -229,6 +229,40 @@
       color: var(--muted);
       font-size: 16px;
       line-height: 1.75;
+    }
+
+    .platform-note {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 24px;
+      padding: 10px 18px;
+      background: #ffffff;
+      border: 1px solid var(--border-strong);
+      border-radius: 9px;
+      font-size: 12.5px;
+      color: var(--muted);
+      max-width: 640px;
+      text-align: left;
+      line-height: 1.5;
+      box-shadow: 0 2px 8px rgba(16, 32, 26, 0.04);
+    }
+
+    .platform-note-icon {
+      width: 20px;
+      height: 20px;
+      min-width: 20px;
+      border-radius: 50%;
+      background: var(--mint);
+      color: var(--green);
+      display: grid;
+      place-items: center;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .platform-note strong {
+      color: var(--text);
     }
 
     .hero-actions {
@@ -298,7 +332,7 @@
       justify-content: center;
       flex-wrap: wrap;
       gap: 22px;
-      margin-top: 24px;
+      margin-top: 26px;
       color: var(--soft);
       font-size: 11px;
       font-family: var(--mono);
@@ -309,214 +343,6 @@
       margin-right: 6px;
       color: var(--emerald);
       font-weight: 700;
-    }
-
-    /* LIVE EXECUTION TAPE STRIP */
-    .tape-strip {
-      width: 100%;
-      max-width: var(--max);
-      margin-top: 44px;
-      background: #ffffff;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      box-shadow:
-        0 20px 45px -10px rgba(16, 32, 26, 0.08),
-        0 4px 12px rgba(16, 32, 26, 0.03);
-      overflow: hidden;
-      text-align: left;
-    }
-
-    .tape-strip-header {
-      height: 38px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 16px;
-      background: #fafbfa;
-      border-bottom: 1px solid var(--border);
-      font-family: var(--mono);
-      font-size: 8px;
-      font-weight: 700;
-      letter-spacing: .06em;
-      color: var(--soft);
-      text-transform: uppercase;
-    }
-
-    .tape-strip-header-left {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .pulse-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--emerald);
-      box-shadow: 0 0 0 2px var(--mint);
-      animation: pulse-dot-anim 2s infinite ease-in-out;
-    }
-
-    @keyframes pulse-dot-anim {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.45; transform: scale(0.85); }
-    }
-
-    .tape-items {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-    }
-
-    .tape-item {
-      padding: 16px 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      border-right: 1px solid var(--border);
-      transition: background 0.15s ease;
-    }
-
-    .tape-item:last-child {
-      border-right: 0;
-    }
-
-    .tape-item:hover {
-      background: #f8faf9;
-    }
-
-    .tape-item-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .tape-sym {
-      font-size: 14px;
-      font-weight: 800;
-      color: var(--text);
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .tape-sym::before {
-      content: "";
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      background: var(--emerald);
-    }
-
-    .side-pill {
-      padding: 2px 7px;
-      border-radius: 4px;
-      font-family: var(--mono);
-      font-size: 8px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    .side-pill.buy {
-      background: var(--mint);
-      color: var(--green);
-    }
-
-    .side-pill.short {
-      background: var(--red-bg);
-      color: var(--red);
-    }
-
-    .tape-item-price {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--muted);
-      font-weight: 600;
-    }
-
-    .tape-item-bottom {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-top: 4px;
-      padding-top: 8px;
-      border-top: 1px solid #edf1ef;
-      font-family: var(--mono);
-      font-size: 9px;
-    }
-
-    .tape-meta-pill {
-      color: var(--yellow);
-      font-weight: 700;
-    }
-
-    .route-pill {
-      padding: 1px 6px;
-      border-radius: 3px;
-      background: var(--blue-bg);
-      color: var(--blue);
-      font-size: 8px;
-      font-weight: 700;
-      margin-left: 6px;
-    }
-
-    .tape-pnl {
-      font-size: 12px;
-      font-weight: 800;
-      color: var(--green);
-    }
-
-    /* 3 FEATURE PILLARS */
-    .hero-cards {
-      width: 100%;
-      max-width: var(--max);
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-top: 20px;
-      text-align: left;
-    }
-
-    .hero-card {
-      background: #ffffff;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 22px 24px;
-      box-shadow: 0 4px 14px rgba(16, 32, 26, 0.03);
-      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-    }
-
-    .hero-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 24px rgba(16, 32, 26, 0.07);
-      border-color: var(--border-strong);
-    }
-
-    .hero-card-tag {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-family: var(--mono);
-      font-size: 9px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .06em;
-      color: var(--green);
-      margin-bottom: 8px;
-    }
-
-    .hero-card-title {
-      font-size: 17px;
-      font-weight: 800;
-      letter-spacing: -.02em;
-      color: var(--text);
-      margin-bottom: 8px;
-    }
-
-    .hero-card-desc {
-      font-size: 13px;
-      color: var(--muted);
-      line-height: 1.6;
     }
 
     /* =====================================================
@@ -1231,21 +1057,11 @@
 
     @media (max-width: 950px) {
 
-      .tape-items,
-      .hero-cards,
       .feature-layout,
       .route-grid,
       .privacy-box,
       .install-grid {
         grid-template-columns: 1fr;
-      }
-
-      .tape-item {
-        border-right: 0;
-        border-bottom: 1px solid var(--border);
-      }
-      .tape-item:last-child {
-        border-bottom: 0;
       }
 
       .feature-layout {
@@ -1425,6 +1241,13 @@
           Hammer Pro is a focused trading journal for tape scalpers. Import your raw executions and see the details that disappear from memory after the session — hold time, route, slippage, fees and true net P&amp;L.
         </p>
 
+        <div class="platform-note">
+          <div class="platform-note-icon">ℹ</div>
+          <div>
+            <strong>Compatibility Notice:</strong> As of now, Hammer Pro Journal exclusively supports trading platform log exports from <strong>Hammer Pro (Alaric Securities)</strong>.
+          </div>
+        </div>
+
         <div class="hero-actions">
 
           <a id="btn-win" class="button button-primary" href="https://github.com/Web-Traveller/hammer-pro-journal/releases/latest">
@@ -1450,106 +1273,6 @@
           <span>No broker login required</span>
           <span>Raw trade imports</span>
           <span>Zero cloud latency</span>
-        </div>
-
-        <!-- LIVE EXECUTION TAPE STRIP -->
-        <div class="tape-strip">
-
-          <div class="tape-strip-header">
-            <div class="tape-strip-header-left">
-              <span class="pulse-dot"></span>
-              <span>LIVE LEVEL 2 EXECUTION STREAM</span>
-            </div>
-            <span>LOCAL SQLITE · ZERO LATENCY</span>
-          </div>
-
-          <div class="tape-items">
-
-            <div class="tape-item">
-              <div class="tape-item-top">
-                <span class="tape-sym">NVDA</span>
-                <span class="side-pill buy">BUY 300</span>
-              </div>
-              <div class="tape-item-price">181.20 → 181.90</div>
-              <div class="tape-item-bottom">
-                <div>
-                  <span class="tape-meta-pill">1.4s</span>
-                  <span class="route-pill">ARCA</span>
-                </div>
-                <span class="tape-pnl">+$205.80</span>
-              </div>
-            </div>
-
-            <div class="tape-item">
-              <div class="tape-item-top">
-                <span class="tape-sym">TSLA</span>
-                <span class="side-pill short">SHORT 400</span>
-              </div>
-              <div class="tape-item-price">247.80 → 246.90</div>
-              <div class="tape-item-bottom">
-                <div>
-                  <span class="tape-meta-pill">4.1s</span>
-                  <span class="route-pill">EDGX</span>
-                </div>
-                <span class="tape-pnl">+$354.40</span>
-              </div>
-            </div>
-
-            <div class="tape-item">
-              <div class="tape-item-top">
-                <span class="tape-sym">AMD</span>
-                <span class="side-pill buy">BUY 500</span>
-              </div>
-              <div class="tape-item-price">167.10 → 167.85</div>
-              <div class="tape-item-bottom">
-                <div>
-                  <span class="tape-meta-pill">2.8s</span>
-                  <span class="route-pill">NSDQ</span>
-                </div>
-                <span class="tape-pnl">+$367.90</span>
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-
-        <!-- 3 SCALPER CAPABILITY PILLARS -->
-        <div class="hero-cards">
-
-          <div class="hero-card">
-            <div class="hero-card-tag">
-              <span class="eyebrow-dot" style="width:5px;height:5px;"></span>
-              Hold Velocity
-            </div>
-            <div class="hero-card-title">Sub-Second Timing</div>
-            <p class="hero-card-desc">
-              Track trade duration down to milliseconds (0.4s – 4.2s). Audit whether you cut winning momentum too early or hold red trades too long.
-            </p>
-          </div>
-
-          <div class="hero-card">
-            <div class="hero-card-tag">
-              <span class="eyebrow-dot" style="width:5px;height:5px;"></span>
-              ECN Routing Alpha
-            </div>
-            <div class="hero-card-title">Maker/Taker Rebates</div>
-            <p class="hero-card-desc">
-              Calculate exact exchange rebates and pass-through fees across ARCA, EDGX, NSDQ, and BATS. Keep the profits that routes bleed.
-            </p>
-          </div>
-
-          <div class="hero-card">
-            <div class="hero-card-tag">
-              <span class="eyebrow-dot" style="width:5px;height:5px;"></span>
-              100% Offline Vault
-            </div>
-            <div class="hero-card-title">Strict Local Storage</div>
-            <p class="hero-card-desc">
-              Your trading edge stays on your machine. Zero broker passwords, zero cloud tracking, and zero subscription servers sniffing your fills.
-            </p>
-          </div>
-
         </div>
 
       </div>
