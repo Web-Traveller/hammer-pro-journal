@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hammer Pro Journal — The Tape-Speed Trading Journal</title>
+  <meta name="description" content="The elite trading journal engineered exclusively for Level 2 tape scalpers. Track holding velocity, ECN route fills, slippage, and gross/net P&L with zero candlestick noise. 100% local-first privacy.">
+  <meta name="keywords" content="trading journal, tape reading, level 2 scalping, order flow, day trading, ECN routes, hammer pro">
+  <link rel="icon" type="image/png" href="app_icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-base: #06090e;
+      --bg-surface: #0c121d;
+      --bg-surface-elevated: #111a29;
+      --border-subtle: rgba(16, 185, 129, 0.12);
+      --border-glow: rgba(16, 185, 129, 0.35);
+      --primary: #10b981;
+      --primary-glow: rgba(16, 185, 129, 0.25);
+      --primary-dark: #065f46;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-faint: #64748b;
+      --accent-gold: #f59e0b;
+      --accent-blue: #38bdf8;
+      --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Ambient Background Glow */
+    .ambient-glow {
+      position: fixed;
+      top: -20%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 1000px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, rgba(6, 95, 70, 0.05) 45%, rgba(6, 9, 14, 0) 70%);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .ambient-glow-bottom {
+      position: fixed;
+      bottom: -15%;
+      right: -10%;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.08) 0%, rgba(6, 9, 14, 0) 70%);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* HEADER */
+    header {
+      padding: 1.5rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(6, 9, 14, 0.85);
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: var(--text-main);
+    }
+
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #10b981 0%, #064e3b 100%);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 16px rgba(16, 185, 129, 0.35);
+    }
+
+    .brand-icon svg {
+      width: 20px;
+      height: 20px;
+      color: #ffffff;
+      fill: currentColor;
+    }
+
+    .brand-text {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .brand-badge {
+      font-size: 0.7rem;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #34d399;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .nav-link {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: color 0.2s;
+    }
+
+    .nav-link:hover {
+      color: var(--text-main);
+    }
+
+    .header-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-main);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .header-cta:hover {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    /* HERO */
+    .hero {
+      padding: 5rem 0 3.5rem;
+      text-align: center;
+    }
+
+    .version-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      padding: 0.35rem 1rem;
+      border-radius: 9999px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #34d399;
+      margin-bottom: 1.75rem;
+    }
+
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
+      background-color: var(--primary);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--primary);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    .hero-title {
+      font-size: clamp(2.5rem, 5.5vw, 4.2rem);
+      font-weight: 900;
+      letter-spacing: -0.035em;
+      line-height: 1.1;
+      margin-bottom: 1.5rem;
+      background: linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-title span {
+      background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-subtitle {
+      font-size: clamp(1.05rem, 2vw, 1.25rem);
+      color: var(--text-muted);
+      max-width: 680px;
+      margin: 0 auto 2.75rem;
+      font-weight: 500;
+      line-height: 1.65;
+    }
+
+    /* DOWNLOAD CTA BUTTONS */
+    .cta-cluster {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.25rem;
+      margin-bottom: 3.5rem;
+    }
+
+    .btn-main-download {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.85rem;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      padding: 1.1rem 2.5rem;
+      border-radius: 12px;
+      font-size: 1.15rem;
+      font-weight: 800;
+      text-decoration: none;
+      box-shadow: 0 0 35px rgba(16, 185, 129, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-main-download:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 50px rgba(16, 185, 129, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+      background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+    }
+
+    .btn-main-download svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .download-meta {
+      font-size: 0.82rem;
+      color: var(--text-faint);
+      font-weight: 600;
+    }
+
+    .alt-downloads {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .alt-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      background: var(--bg-surface);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--text-muted);
+      padding: 0.55rem 1rem;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .alt-btn:hover {
+      background: var(--bg-surface-elevated);
+      border-color: rgba(255, 255, 255, 0.2);
+      color: var(--text-main);
+    }
+
+    /* SMARTSCREEN BYPASS CALLOUT (SOLVES USER'S MAIN PAIN POINT) */
+    .smartscreen-box {
+      max-width: 820px;
+      margin: 0 auto 5rem;
+      background: linear-gradient(145deg, rgba(17, 26, 41, 0.8) 0%, rgba(12, 18, 29, 0.9) 100%);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 1.75rem 2rem;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      text-align: left;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .smartscreen-box::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--primary);
+    }
+
+    .smartscreen-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .smartscreen-header h3 {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--text-main);
+    }
+
+    .badge-info {
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: var(--accent-blue);
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-weight: 700;
+    }
+
+    .smartscreen-p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 1.25rem;
+      line-height: 1.6;
+    }
+
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+    }
+
+    .step-card {
+      background: rgba(6, 9, 14, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+    }
+
+    .step-num {
+      display: inline-block;
+      width: 22px;
+      height: 22px;
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--primary);
+      border-radius: 50%;
+      font-size: 0.75rem;
+      font-weight: 800;
+      text-align: center;
+      line-height: 22px;
+      margin-bottom: 0.5rem;
+    }
+
+    .step-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 0.35rem;
+    }
+
+    .step-desc {
+      font-size: 0.8rem;
+      color: var(--text-faint);
+    }
+
+    .step-desc kbd {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      padding: 1px 5px;
+      color: var(--text-main);
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+    }
+
+    /* FEATURES GRID */
+    .features-section {
+      padding: 3rem 0 6rem;
+    }
+
+    .section-head {
+      text-align: center;
+      margin-bottom: 3.5rem;
+    }
+
+    .section-head h2 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.75rem;
+    }
+
+    .section-head p {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .feature-card {
+      background: var(--bg-surface);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      padding: 2rem;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--border-glow);
+      box-shadow: 0 12px 30px rgba(16, 185, 129, 0.1);
+    }
+
+    .feature-icon-wrap {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.25rem;
+      color: var(--primary);
+    }
+
+    .feature-card h3 {
+      font-size: 1.2rem;
+      font-weight: 800;
+      margin-bottom: 0.6rem;
+      color: var(--text-main);
+    }
+
+    .feature-card p {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* CHANGELOG ACCORDION */
+    .changelog-section {
+      max-width: 820px;
+      margin: 0 auto 6rem;
+      background: var(--bg-surface);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 16px;
+      padding: 2rem;
+    }
+
+    .changelog-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .changelog-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .changelog-body {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      white-space: pre-wrap;
+      line-height: 1.7;
+      background: rgba(6, 9, 14, 0.5);
+      border-radius: 8px;
+      padding: 1.25rem;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      max-height: 250px;
+      overflow-y: auto;
+    }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 3rem 0;
+      text-align: center;
+      color: var(--text-faint);
+      font-size: 0.88rem;
+    }
+
+    .footer-links {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .footer-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .footer-links a:hover {
+      color: var(--primary);
+    }
+
+    @media (max-width: 640px) {
+      .hero { padding: 3rem 0 2.5rem; }
+      .btn-main-download { width: 100%; }
+      .alt-downloads { flex-direction: column; width: 100%; }
+      .alt-btn { width: 100%; justify-content: center; }
+      .steps-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="ambient-glow"></div>
+  <div class="ambient-glow-bottom"></div>
+
+  <!-- STICKY TOP NAVBAR -->
+  <header>
+    <div class="container header-inner">
+      <a href="#" class="brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
+        </div>
+        <div class="brand-text">
+          Hammer Pro <span class="brand-badge js-version-tag">v2.3.0</span>
+        </div>
+      </a>
+
+      <div class="nav-links">
+        <a href="#features" class="nav-link">Features</a>
+        <a href="#security" class="nav-link">SmartScreen Help</a>
+        <a href="#changelog" class="nav-link">Changelog</a>
+        <a href="https://github.com/Web-Traveller/hammer-pro-journal" target="_blank" rel="noopener noreferrer" class="header-cta">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- HERO SECTION -->
+  <section class="hero">
+    <div class="container">
+      <div class="version-pill">
+        <span class="pulse-dot"></span>
+        <span>Latest Release: <strong class="js-version-tag">v2.3.0</strong> (Live)</span>
+      </div>
+
+      <h1 class="hero-title">
+        The Tape-Speed Journal<br>
+        for <span>Level 2 Scalpers</span>.
+      </h1>
+
+      <p class="hero-subtitle">
+        Track microsecond hold speed, ECN route fills, slippage, and gross/net P&amp;L with zero candlestick noise. 100% local-first privacy with optional Cloudflare R2 backup.
+      </p>
+
+      <!-- PRIMARY DOWNLOAD ACTIONS -->
+      <div class="cta-cluster">
+        <a id="btn-download-win" href="https://github.com/Web-Traveller/hammer-pro-journal/releases/latest" class="btn-main-download">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Download for Windows</span>
+        </a>
+
+        <div class="download-meta" id="win-size-label">
+          v2.3.0 • Standalone Setup • Windows 10/11 (64-bit)
+        </div>
+
+        <div class="alt-downloads">
+          <a id="btn-download-zip" href="https://github.com/Web-Traveller/hammer-pro-journal/releases/latest" class="alt-btn" title="Bypasses Microsoft Edge download block">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 7h10M7 12h10M7 17h10"/></svg>
+            Download as .ZIP (SmartScreen Bypass)
+          </a>
+          <a id="btn-download-apk" href="https://github.com/Web-Traveller/hammer-pro-journal/releases/latest" class="alt-btn" title="Android Companion App">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+            Android APK Mobile
+          </a>
+          <a href="https://github.com/Web-Traveller/hammer-pro-journal/releases/latest" class="alt-btn" target="_blank">
+            All Release Files →
+          </a>
+        </div>
+      </div>
+
+      <!-- MICROSOFT DEFENDER & SMARTSCREEN 2-STEP GUIDANCE -->
+      <div id="security" class="smartscreen-box">
+        <div class="smartscreen-header">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <h3>Installing for the first time?</h3>
+          <span class="badge-info">Windows SmartScreen Note</span>
+        </div>
+        <p class="smartscreen-p">
+          Because Hammer Pro Journal is an indie desktop application without a $500/year enterprise corporate certificate, Microsoft Edge and Windows Defender SmartScreen may display a generic <em>"Not commonly downloaded"</em> prompt. <strong>The app is 100% clean, open-source-backed, and local-first.</strong>
+        </p>
+
+        <div class="steps-grid">
+          <div class="step-card">
+            <span class="step-num">1</span>
+            <div class="step-title">In Microsoft Edge</div>
+            <div class="step-desc">
+              Hover over download, click <kbd>...</kbd> (Options) &rarr; Select <kbd>Keep</kbd> &rarr; Click <kbd>Keep anyway</kbd>.
+            </div>
+          </div>
+          <div class="step-card">
+            <span class="step-num">2</span>
+            <div class="step-title">In Windows Defender</div>
+            <div class="step-desc">
+              When the blue prompt appears, click <kbd>More info</kbd> &rarr; Click <kbd>Run anyway</kbd>.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES MATRIX -->
+  <section id="features" class="features-section">
+    <div class="container">
+      <div class="section-head">
+        <h2>Engineered for Tape Scalpers</h2>
+        <p>Built for traders who live in Level 2 and Time &amp; Sales. No lagging moving averages. No bloated candlestick charts.</p>
+      </div>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-icon-wrap">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <h3>0ms Tape Hold Velocity</h3>
+          <p>Automatic sub-second hold time calculation. Track exactly how holding an extra 8 seconds impacts your trade profit factor.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrap">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </div>
+          <h3>ECN Route &amp; Fee Matrix</h3>
+          <p>Breakdown fills by ARCA, EDGX, NSDQ, and BATS. Understand liquidity rebates versus crossing-the-spread slippage costs.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrap">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <h3>100% Local-First Privacy</h3>
+          <p>All broker logs and screenshots remain strictly on your local disk. We never sell, harvest, or aggregate your trading data.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrap">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+          </div>
+          <h3>Cloudflare R2 Pro Sync</h3>
+          <p>Seamlessly sync your verified trades between your Trading Desktop, Travel Laptop, and Mobile with zero lag.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrap">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <h3>Multi-Account Management</h3>
+          <p>Isolate your Premarket, Prop firm, Cash, and Main accounts with independent logs and dedicated disk sandboxes.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrap">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+          <h3>Single Tape Strategy Focus</h3>
+          <p>No multi-setup playbook complexity. Designed around one execution model: pure tape scalping order flow.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LIVE CHANGELOG SECTION -->
+  <section id="changelog" class="container">
+    <div class="changelog-section">
+      <div class="changelog-header">
+        <div class="changelog-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <span>Latest Release Changelog (<span class="js-version-tag">v2.3.0</span>)</span>
+        </div>
+        <a href="https://github.com/Web-Traveller/hammer-pro-journal/releases" target="_blank" style="color: var(--primary); font-size: 0.8rem; text-decoration: none; font-weight: 700;">
+          All Releases &rarr;
+        </a>
+      </div>
+      <div id="release-notes-content" class="changelog-body">
+Loading latest release notes directly from GitHub...
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="#features">Features</a>
+        <a href="#security">Installation Guide</a>
+        <a href="https://github.com/Web-Traveller/hammer-pro-journal" target="_blank">GitHub Repository</a>
+        <a href="https://github.com/Web-Traveller/hammer-pro-journal/releases" target="_blank">Release Archives</a>
+      </div>
+      <p>&copy; 2026 Hammer Pro Journal. Built for tape scalpers. Your trades remain 100% private on your machine.</p>
+    </div>
+  </footer>
+
+  <!-- DYNAMIC AUTO-UPDATING JAVASCRIPT -->
+  <!-- Automatically pulls newest tag, download links, and release notes from GitHub on every page visit! -->
+  <script>
+    (function() {
+      const GITHUB_REPO = 'Web-Traveller/hammer-pro-journal';
+      const GITHUB_API = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
+      const RAW_LATEST_JSON = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/latest.json`;
+
+      async function updateLandingPage() {
+        let release = null;
+
+        // 1. Fetch from GitHub API
+        try {
+          const res = await fetch(GITHUB_API);
+          if (res.ok) {
+            release = await res.json();
+          }
+        } catch (err) {
+          console.warn('GitHub API rate limited or unreachable. Attempting raw JSON fallback...');
+        }
+
+        // 2. Fallback to latest.json on raw.githubusercontent (unmetered, zero rate limits!)
+        if (!release) {
+          try {
+            const rawRes = await fetch(RAW_LATEST_JSON);
+            if (rawRes.ok) {
+              const rawData = await rawRes.json();
+              const vTag = 'v' + (rawData.version || '2.3.0').replace(/^v/, '');
+              release = {
+                tag_name: vTag,
+                name: `Hammer Pro Journal ${vTag}`,
+                body: rawData.notes || 'Latest bug fixes, security hardening, and performance improvements.',
+                published_at: rawData.pub_date,
+                assets: [
+                  {
+                    name: `Hammer_Pro_Journal_${rawData.version}_x64-setup.exe`,
+                    browser_download_url: rawData.platforms?.['windows-x86_64']?.url || `https://github.com/${GITHUB_REPO}/releases/download/${vTag}/Hammer.Pro.Journal_${rawData.version}_x64-setup.exe`
+                  }
+                ]
+              };
+            }
+          } catch (err) {
+            console.warn('Fallback failed:', err);
+          }
+        }
+
+        if (!release) return;
+
+        // 3. Update all version badges
+        const versionStr = release.tag_name || 'v2.3.0';
+        document.querySelectorAll('.js-version-tag').forEach(el => {
+          el.textContent = versionStr;
+        });
+
+        // 4. Resolve download links
+        const assets = release.assets || [];
+        const exeAsset = assets.find(a => a.name.endsWith('.exe') || a.name.endsWith('.msi'));
+        const zipAsset = assets.find(a => a.name.endsWith('.zip'));
+        const apkAsset = assets.find(a => a.name.endsWith('.apk'));
+
+        const winBtn = document.getElementById('btn-download-win');
+        const sizeLabel = document.getElementById('win-size-label');
+
+        if (exeAsset) {
+          if (winBtn) winBtn.href = exeAsset.browser_download_url;
+          const mb = exeAsset.size ? (exeAsset.size / (1024 * 1024)).toFixed(1) + ' MB' : 'Installer';
+          if (sizeLabel) sizeLabel.textContent = `${versionStr} • ${mb} • Windows 10/11 (64-bit)`;
+        } else {
+          // Fallback direct URL
+          if (winBtn) winBtn.href = `https://github.com/${GITHUB_REPO}/releases/latest`;
+        }
+
+        const zipBtn = document.getElementById('btn-download-zip');
+        if (zipAsset && zipBtn) {
+          zipBtn.href = zipAsset.browser_download_url;
+        } else if (zipBtn) {
+          zipBtn.href = `https://github.com/${GITHUB_REPO}/releases/latest`;
+        }
+
+        const apkBtn = document.getElementById('btn-download-apk');
+        if (apkAsset && apkBtn) {
+          apkBtn.href = apkAsset.browser_download_url;
+        } else if (apkBtn) {
+          apkBtn.href = `https://github.com/${GITHUB_REPO}/releases/latest`;
+        }
+
+        // 5. Update Changelog
+        const notesBox = document.getElementById('release-notes-content');
+        if (notesBox && release.body) {
+          notesBox.textContent = release.body;
+        }
+      }
+
+      // Execute on DOM ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', updateLandingPage);
+      } else {
+        updateLandingPage();
+      }
+    })();
+  </script>
+</body>
+</html>
