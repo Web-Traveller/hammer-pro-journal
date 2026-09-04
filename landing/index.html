@@ -1928,74 +1928,108 @@
 
   <script>
     (function () {
-      const API_URL = 'https://api.github.com/repos/Web-Traveller/hammer-pro-journal/releases/latest';
-      const FALLBACK_URL = 'https://raw.githubusercontent.com/Web-Traveller/hammer-pro-journal/main/latest.json';
+      const SOURCES = [
+        './latest.json',
+        'https://raw.githubusercontent.com/Web-Traveller/hammer-pro-journal/main/public/latest.json',
+        'https://api.github.com/repos/Web-Traveller/hammer-pro-journal/releases/latest'
+      ];
 
       async function syncLatestBuild() {
-        try {
-          let data = null;
+        let data = null;
+
+        for (const url of SOURCES) {
           try {
-            const res = await fetch(API_URL);
+            const res = await fetch(url, { cache: 'no-cache' });
             if (res.ok) {
-              data = await res.json();
+              const json = await res.json();
+              if (json && (json.version || json.tag_name)) {
+                data = json;
+                break;
+              }
             }
-          } catch (apiErr) {
-            console.warn('GitHub API rate limited or unreachable, trying fallback manifest...', apiErr);
+          } catch (e) {
+            // try next endpoint
+          }
+        }
+
+        if (!data) return;
+
+        try {
+          // Parse version string cleanly
+          let version = '2.3.1';
+          if (data.version) {
+            version = data.version.replace(/^v/, '');
+          } else if (data.tag_name) {
+            version = data.tag_name.replace(/^v/, '');
           }
 
-          if (!data) {
-            const fbRes = await fetch(FALLBACK_URL);
-            if (fbRes.ok) {
-              data = await fbRes.json();
-            }
-          }
+          const tag = 'v' + version;
 
-          if (!data) return;
-
-          const rawTag = data.tag_name || data.version || 'v2.3.1';
-          const tag = rawTag.startsWith('v') ? rawTag : `v${rawTag}`;
-
-          // Update all version pills across the page
+          // 1. Update all version badges across the entire page
           document.querySelectorAll('.js-ver-pill').forEach(el => {
             el.textContent = tag;
           });
 
+          // 2. Resolve direct binary download URLs
+          let winUrl = '';
+          let apkUrl = '';
+          let zipUrl = '';
+
+          // Check if payload is from latest.json manifest
+          if (data.platforms && data.platforms['windows-x86_64'] && data.platforms['windows-x86_64'].url) {
+            winUrl = data.platforms['windows-x86_64'].url;
+          }
+
+          // Check if payload is from GitHub Releases API assets
+          if (Array.isArray(data.assets) && data.assets.length > 0) {
+            const winAsset = data.assets.find(a => a.name && (a.name.endsWith('.exe') || a.name.endsWith('.msi')));
+            const apkAsset = data.assets.find(a => a.name && a.name.endsWith('.apk'));
+            const zipAsset = data.assets.find(a => a.name && a.name.endsWith('.zip'));
+
+            if (winAsset && !winUrl) winUrl = winAsset.browser_download_url;
+            if (apkAsset) apkUrl = apkAsset.browser_download_url;
+            if (zipAsset) zipUrl = zipAsset.browser_download_url;
+          }
+
+          // Guaranteed deterministic fallback links based on release tag
+          if (!winUrl) {
+            winUrl = `https://github.com/Web-Traveller/hammer-pro-journal/releases/download/${tag}/Hammer.Pro.Journal_${version}_x64-setup.exe`;
+          }
+          if (!apkUrl) {
+            apkUrl = `https://github.com/Web-Traveller/hammer-pro-journal/releases/download/${tag}/app-release.apk`;
+          }
+          if (!zipUrl) {
+            zipUrl = `https://github.com/Web-Traveller/hammer-pro-journal/releases/download/${tag}/Hammer.Pro.Journal_${version}_x64-portable.zip`;
+          }
+
+          // 3. Wire up all interactive buttons
           const navBtn = document.getElementById('nav-win-btn');
           if (navBtn) {
             navBtn.innerHTML = `Download <span class="js-ver-pill">${tag}</span>`;
+            navBtn.href = winUrl;
           }
+
+          const winBtn = document.getElementById('btn-win');
+          if (winBtn) winBtn.href = winUrl;
 
           const winText = document.getElementById('win-btn-text');
           if (winText) {
             winText.textContent = `Download for Windows (.exe)`;
           }
 
+          const apkBtn = document.getElementById('btn-apk');
+          if (apkBtn) apkBtn.href = apkUrl;
+
+          const zipBtn = document.getElementById('btn-zip');
+          if (zipBtn) zipBtn.href = zipUrl;
+
           const ctaBtn = document.getElementById('cta-win-btn');
           if (ctaBtn) {
             ctaBtn.innerHTML = `Download Hammer Pro ${tag} →`;
-          }
-
-          const assets = data.assets || [];
-          const winAsset = assets.find(a => a.name && (a.name.endsWith('.exe') || a.name.endsWith('.msi')));
-          const apkAsset = assets.find(a => a.name && a.name.endsWith('.apk'));
-          const zipAsset = assets.find(a => a.name && a.name.endsWith('.zip')) || assets.find(a => a.name && a.name.endsWith('.msi'));
-
-          if (winAsset) {
-            const winBtn = document.getElementById('btn-win');
-            if (winBtn) winBtn.href = winAsset.browser_download_url;
-            if (navBtn) navBtn.href = winAsset.browser_download_url;
-            if (ctaBtn) ctaBtn.href = winAsset.browser_download_url;
-          }
-          if (apkAsset) {
-            const apkBtn = document.getElementById('btn-apk');
-            if (apkBtn) apkBtn.href = apkAsset.browser_download_url;
-          }
-          if (zipAsset) {
-            const zipBtn = document.getElementById('btn-zip');
-            if (zipBtn) zipBtn.href = zipAsset.browser_download_url;
+            ctaBtn.href = winUrl;
           }
         } catch (err) {
-          console.error('Failed to sync latest build:', err);
+          console.error('Failed to sync latest build details:', err);
         }
       }
 
