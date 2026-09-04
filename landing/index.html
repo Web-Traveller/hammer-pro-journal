@@ -1,44 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hammer Pro Journal — The Level 2 Tape Scalper's Journal</title>
-  <meta name="description" content="The high-frequency trading journal built strictly for Level 2 and Time & Sales tape scalpers. Track millisecond hold speed, ECN route fills, slippage, and gross/net P&L with 100% local-first privacy.">
-  <link rel="icon" type="image/png" href="app_icon.png">
+
+  <title>Hammer Pro — Trading Journal for Tape Scalpers</title>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap"
+    rel="stylesheet">
 
   <style>
     :root {
-      --bg-canvas: #f4f5f7;
-      --panel-bg: #ffffff;
-      --border-light: #e5e7eb;
-      --border-hover: #d1d5db;
-      
-      --text-main: #0f172a;
-      --text-muted: #64748b;
-      --text-light: #94a3b8;
-      
-      --hero-green: #064e3b;
-      --hero-green-hover: #043e2e;
-      --emerald: #10b981;
-      --mint-bg: #d1fae5;
-      --mint-text: #065f46;
-      
-      --rose-bg: #ffe4e6;
-      --rose-text: #9f1239;
-      --rose-accent: #f43f5e;
-      
-      --purple-bg: #f3e8ff;
-      --purple-text: #6b21a8;
-      
-      --blue-bg: #eff6ff;
-      --blue-text: #1e40af;
-      
-      --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
+      --bg: #f5f7f6;
+      --white: #ffffff;
+      --green: #075c43;
+      --green-2: #0a7655;
+      --emerald: #12a875;
+      --mint: #dcf7eb;
+      --mint-2: #edf9f3;
+
+      --text: #10201a;
+      --muted: #66756f;
+      --soft: #8b9893;
+
+      --border: #e1e8e4;
+      --border-strong: #d0dad5;
+
+      --red: #d94b5b;
+      --red-bg: #fff0f2;
+
+      --yellow: #a97816;
+      --yellow-bg: #fff8df;
+
+      --blue: #3565a8;
+      --blue-bg: #eef5ff;
+
+      --sans: "Plus Jakarta Sans", sans-serif;
+      --mono: "JetBrains Mono", monospace;
+
+      --max: 1180px;
     }
 
     * {
@@ -47,1115 +52,2557 @@
       padding: 0;
     }
 
+    html {
+      scroll-behavior: smooth;
+    }
+
     body {
-      background-color: var(--bg-canvas);
-      color: var(--text-main);
-      font-family: var(--font-sans);
-      line-height: 1.5;
-      overflow-x: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
       -webkit-font-smoothing: antialiased;
+      line-height: 1.5;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
     }
 
     .container {
-      width: 100%;
-      max-width: 1240px;
+      width: min(var(--max), calc(100% - 40px));
       margin: 0 auto;
-      padding: 0 1.5rem;
     }
 
-    /* TOP NAVIGATION */
+    /* =====================================================
+       NAV
+    ===================================================== */
+
     header {
-      background-color: #ffffff;
-      border-bottom: 1px solid var(--border-light);
+      height: 70px;
+      background: rgba(255, 255, 255, .9);
+      border-bottom: 1px solid var(--border);
+
       position: sticky;
       top: 0;
       z-index: 100;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+
+      backdrop-filter: blur(14px);
     }
 
-    .nav-bar {
+    .nav {
+      height: 100%;
+
       display: flex;
       align-items: center;
       justify-content: space-between;
-      height: 72px;
     }
 
-    .logo-group {
+    .brand {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
-      text-decoration: none;
-      color: var(--hero-green);
+      gap: 11px;
     }
 
-    .logo-icon {
-      width: 38px;
-      height: 38px;
-      background-color: var(--mint-bg);
-      color: var(--hero-green);
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+    .brand-mark {
+      width: 34px;
+      height: 34px;
 
-    .logo-icon svg {
-      width: 22px;
-      height: 22px;
-      fill: currentColor;
-    }
+      display: grid;
+      place-items: center;
 
-    .logo-text {
-      font-size: 1.25rem;
+      background: var(--green);
+      color: white;
+
+      border-radius: 9px;
+
       font-weight: 800;
-      letter-spacing: -0.02em;
-      color: var(--hero-green);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
+      font-size: 15px;
     }
 
-    .version-tag {
-      font-size: 0.7rem;
-      background-color: var(--mint-bg);
-      color: var(--mint-text);
-      padding: 2px 8px;
-      border-radius: 9999px;
-      font-weight: 700;
+    .brand-name {
+      font-weight: 800;
+      letter-spacing: -.035em;
+      font-size: 16px;
     }
 
-    .nav-menu {
-      display: flex;
-      align-items: center;
-      gap: 2rem;
-    }
+    .brand-version {
+      margin-left: 6px;
 
-    .nav-link {
-      color: var(--text-muted);
-      text-decoration: none;
-      font-size: 0.92rem;
+      padding: 3px 7px;
+
+      border-radius: 5px;
+
+      background: var(--mint);
+      color: var(--green);
+
+      font-family: var(--mono);
+      font-size: 9px;
       font-weight: 600;
-      transition: color 0.15s;
     }
 
-    .nav-link:hover {
-      color: var(--hero-green);
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 28px;
     }
 
-    .nav-download-btn {
-      background-color: var(--hero-green);
-      color: #ffffff;
-      padding: 0.6rem 1.25rem;
-      border-radius: 9999px;
-      font-size: 0.88rem;
-      font-weight: 700;
-      text-decoration: none;
+    .nav-links a {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .nav-links a:hover {
+      color: var(--green);
+    }
+
+    .nav-download {
+      padding: 10px 15px;
+
+      border-radius: 7px;
+
+      background: var(--green);
+      color: white !important;
+
+      box-shadow: 0 5px 15px rgba(7, 92, 67, .16);
+    }
+
+    /* =====================================================
+       HERO
+    ===================================================== */
+
+    .hero {
+      padding: 78px 0 65px;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: .84fr 1.16fr;
+      gap: 52px;
+      align-items: center;
+    }
+
+    .eyebrow {
       display: inline-flex;
       align-items: center;
-      gap: 0.5rem;
-      box-shadow: 0 4px 12px rgba(6, 78, 59, 0.15);
-      transition: all 0.15s ease;
+      gap: 8px;
+
+      margin-bottom: 21px;
+
+      color: var(--green);
+
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
     }
 
-    .nav-download-btn:hover {
-      background-color: var(--hero-green-hover);
-      transform: translateY(-1px);
+    .eyebrow-dot {
+      width: 7px;
+      height: 7px;
+
+      border-radius: 50%;
+      background: var(--emerald);
+
+      box-shadow: 0 0 0 4px var(--mint);
     }
 
-    /* SPLIT HERO SECTION */
-    .hero-section {
-      padding: 4.5rem 0 3.5rem;
+    h1 {
+      max-width: 580px;
+
+      font-size: clamp(42px, 4.6vw, 64px);
+      line-height: 1.08;
+
+      letter-spacing: -.03em;
+      font-weight: 800;
     }
 
-    .hero-split-grid {
-      display: grid;
-      grid-template-columns: 1.05fr 1.25fr;
-      gap: 3.5rem;
-      align-items: center;
+    h1 span {
+      color: var(--green);
     }
 
     .hero-copy {
-      text-align: left;
+      max-width: 510px;
+
+      margin-top: 24px;
+
+      color: var(--muted);
+
+      font-size: 15px;
+      line-height: 1.8;
     }
 
-    .hero-badge-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      background-color: var(--mint-bg);
-      color: var(--mint-text);
-      padding: 0.4rem 1rem;
-      border-radius: 9999px;
-      font-size: 0.82rem;
-      font-weight: 700;
-      margin-bottom: 1.5rem;
-    }
-
-    .pulse-beacon {
-      width: 8px;
-      height: 8px;
-      background-color: var(--emerald);
-      border-radius: 50%;
-      box-shadow: 0 0 6px var(--emerald);
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.85); }
-    }
-
-    .hero-headline {
-      font-size: clamp(2.5rem, 4.2vw, 3.8rem);
-      font-weight: 900;
-      letter-spacing: -0.035em;
-      line-height: 1.12;
-      color: var(--text-main);
-      margin-bottom: 1.25rem;
-    }
-
-    .hero-headline span {
-      color: var(--hero-green);
-    }
-
-    .hero-subhead {
-      font-size: 1.12rem;
-      color: var(--text-muted);
-      line-height: 1.65;
-      margin-bottom: 2.25rem;
-    }
-
-    /* ACTION BUTTONS */
-    .action-group {
+    .hero-actions {
       display: flex;
-      flex-direction: column;
-      gap: 0.9rem;
-      margin-bottom: 2rem;
-    }
-
-    .btn-duo {
-      display: flex;
+      gap: 9px;
       align-items: center;
-      gap: 0.85rem;
       flex-wrap: wrap;
+
+      margin-top: 29px;
     }
 
-    .btn-main {
-      background-color: var(--hero-green);
-      color: #ffffff;
-      padding: 1.05rem 2.2rem;
-      border-radius: 9999px;
-      font-size: 1.1rem;
+    .button {
+      min-height: 46px;
+
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+
+      padding: 0 17px;
+
+      border-radius: 7px;
+
+      font-size: 12px;
       font-weight: 800;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.75rem;
-      box-shadow: 0 10px 25px rgba(6, 78, 59, 0.25);
-      transition: all 0.15s ease;
-      border: 1px solid rgba(255, 255, 255, 0.1);
+
+      transition: .18s ease;
+      cursor: pointer;
     }
 
-    .btn-main:hover {
-      background-color: var(--hero-green-hover);
-      transform: translateY(-2px);
-      box-shadow: 0 14px 30px rgba(6, 78, 59, 0.35);
+    .button-primary {
+      background: var(--green);
+      color: white;
+
+      box-shadow: 0 9px 22px rgba(7, 92, 67, .18);
     }
 
-    .btn-main svg {
-      width: 22px;
-      height: 22px;
-    }
-
-    .btn-secondary {
-      background-color: #ffffff;
-      color: var(--text-main);
-      border: 1px solid var(--border-light);
-      padding: 1.05rem 1.6rem;
-      border-radius: 9999px;
-      font-size: 1rem;
-      font-weight: 700;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.6rem;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
-      transition: all 0.15s ease;
-    }
-
-    .btn-secondary:hover {
-      background-color: #f9fafb;
-      border-color: var(--border-hover);
+    .button-primary:hover {
+      background: var(--green-2);
       transform: translateY(-1px);
     }
 
-    .btn-zip-link {
+    .button-secondary {
+      border: 1px solid var(--border-strong);
+      background: white;
+      color: var(--text);
+    }
+
+    .button-secondary:hover {
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    .button-ghost {
+      border: 1px dashed var(--border-strong);
+      background: rgba(255, 255, 255, 0.6);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .button-ghost:hover {
+      border-color: var(--green);
+      color: var(--green);
+      background: #ffffff;
+      transform: translateY(-1px);
+    }
+
+    .hero-trust {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 17px;
+
+      margin-top: 23px;
+
+      color: var(--soft);
+
+      font-size: 10px;
+      font-family: var(--mono);
+    }
+
+    .hero-trust span::before {
+      content: "✓";
+      margin-right: 5px;
+      color: var(--emerald);
+    }
+
+    /* =====================================================
+       APP PREVIEW
+    ===================================================== */
+
+    .app-window {
+      background: white;
+      border: 1px solid rgba(7, 92, 67, 0.16);
+      border-radius: 12px;
+      box-shadow:
+        0 24px 60px -12px rgba(16, 32, 26, 0.14),
+        0 8px 24px -4px rgba(16, 32, 26, 0.06),
+        0 0 0 1px rgba(7, 92, 67, 0.05);
+      overflow: hidden;
+      transition: box-shadow 0.3s ease;
+    }
+
+    .app-window:hover {
+      box-shadow:
+        0 30px 70px -10px rgba(16, 32, 26, 0.18),
+        0 12px 30px -4px rgba(16, 32, 26, 0.08),
+        0 0 0 1px rgba(7, 92, 67, 0.08);
+    }
+
+    .app-top {
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--border);
+      background: #fbfcfc;
+    }
+
+    .app-top-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .window-dots {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .win-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .win-dot.dot-red {
+      background: #ff5f56;
+      border: 1px solid #e0443e;
+    }
+
+    .win-dot.dot-yellow {
+      background: #ffbd2e;
+      border: 1px solid #dea123;
+    }
+
+    .win-dot.dot-green {
+      background: #27c93f;
+      border: 1px solid #1aab29;
+    }
+
+    .app-title {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .app-title-icon {
+      width: 19px;
+      height: 19px;
+      display: grid;
+      place-items: center;
+      background: var(--green);
+      color: white;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .app-ver-tag {
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 600;
+      color: var(--soft);
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: #eef2f0;
+    }
+
+    .session-badge {
       display: inline-flex;
       align-items: center;
-      gap: 0.45rem;
-      background-color: #ffffff;
-      border: 1px solid var(--border-light);
-      color: var(--mint-text);
-      padding: 0.45rem 1rem;
-      border-radius: 9999px;
-      font-size: 0.8rem;
+      gap: 6px;
+      padding: 4px 9px;
+      border-radius: 5px;
+      background: var(--mint);
+      color: var(--green);
+      font-family: var(--mono);
+      font-size: 8px;
       font-weight: 700;
-      text-decoration: none;
-      width: fit-content;
-      transition: all 0.15s;
+      letter-spacing: 0.04em;
     }
 
-    .btn-zip-link:hover {
-      background-color: var(--mint-bg);
-      border-color: var(--emerald);
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 0 2px var(--mint);
+      animation: pulse-dot-anim 2s infinite ease-in-out;
     }
 
-    .spec-points {
+    @keyframes pulse-dot-anim {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.85); }
+    }
+
+    .app-content {
+      padding: 16px 18px;
+    }
+
+    .workspace-bar {
       display: flex;
-      flex-direction: column;
-      gap: 0.45rem;
-      font-size: 0.84rem;
-      color: var(--text-muted);
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #edf1ef;
+    }
+
+    .workspace-tabs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ws-tab {
+      padding: 3px 9px;
+      border-radius: 5px;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: default;
+    }
+
+    .ws-tab.active {
+      background: #eef2f0;
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .workspace-date {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--soft);
+      font-family: var(--mono);
+      font-size: 9px;
       font-weight: 600;
     }
 
-    .spec-item {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
+    .status-dot-green {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--emerald);
     }
 
-    .spec-item svg {
-      color: var(--emerald);
-      flex-shrink: 0;
-    }
-
-    /* RIGHT COLUMN: INTERACTIVE JOURNAL DASHBOARD REPLICA */
-    .cockpit-card {
-      background-color: #ffffff;
-      border: 1px solid var(--border-light);
-      border-radius: 1.5rem;
-      box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.09), 0 1px 3px rgba(0, 0, 0, 0.04);
-      padding: 1.5rem;
-      text-align: left;
-    }
-
-    .cockpit-topbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding-bottom: 1.1rem;
-      border-bottom: 1px solid var(--border-light);
-      margin-bottom: 1.25rem;
-    }
-
-    .topbar-title {
-      font-size: 0.95rem;
-      font-weight: 800;
-      color: var(--text-main);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .topbar-pill {
-      font-size: 0.72rem;
-      background-color: var(--mint-bg);
-      color: var(--mint-text);
-      padding: 3px 9px;
-      border-radius: 9999px;
-      font-weight: 700;
-    }
-
-    /* MINI HERO METRIC STRIP */
-    .hero-stat-duo {
+    .metrics {
       display: grid;
-      grid-template-columns: 1.25fr 1fr;
-      gap: 1rem;
-      margin-bottom: 1.25rem;
+      grid-template-columns: 1.25fr 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
     }
 
-    .metric-card-hero {
-      background-color: var(--hero-green);
+    .metric {
+      padding: 12px 14px;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      position: relative;
+    }
+
+    .metric.main {
+      background: linear-gradient(145deg, #075c43, #054834);
+      border-color: #075c43;
+      color: white;
+      box-shadow: 0 4px 12px rgba(7, 92, 67, 0.18);
+    }
+
+    .metric-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .metric-label {
+      color: var(--soft);
+      font-family: var(--mono);
+      font-size: 8px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      font-weight: 600;
+    }
+
+    .main .metric-label {
+      color: #a8dfc7;
+    }
+
+    .metric-pill {
+      font-family: var(--mono);
+      font-size: 8px;
+      font-weight: 700;
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+
+    .main .metric-pill {
+      background: rgba(255, 255, 255, 0.18);
       color: #ffffff;
-      border-radius: 1.15rem;
-      padding: 1.25rem;
-      box-shadow: 0 8px 20px rgba(6, 78, 59, 0.2);
     }
 
-    .metric-label-hero {
-      font-size: 0.75rem;
+    .metric-pill.pill-green {
+      background: var(--mint);
+      color: var(--green);
+    }
+
+    .metric-pill.pill-neutral {
+      background: #f1f5f3;
+      color: var(--muted);
+    }
+
+    .metric-value {
+      margin-top: 6px;
+      font-family: var(--mono);
+      font-size: 20px;
       font-weight: 700;
-      color: #a7f3d0;
+      letter-spacing: -.03em;
+      line-height: 1.1;
+    }
+
+    .main .metric-value {
+      color: white;
+    }
+
+    .metric-meta {
+      margin-top: 5px;
+      color: var(--soft);
+      font-size: 9px;
+      font-family: var(--sans);
+    }
+
+    .main .metric-meta {
+      color: #c2ebd8;
+    }
+
+    /* TABLE */
+
+    .trade-table {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: white;
+    }
+
+    .table-head,
+    .trade {
+      display: grid;
+      grid-template-columns: 1.05fr 0.85fr 0.75fr 1fr 1fr 0.85fr 0.9fr 1.15fr;
+      align-items: center;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .table-head {
+      min-height: 30px;
+      padding: 0 12px;
+      background: #f8faf9;
+      color: var(--soft);
+      font-family: var(--mono);
+      font-size: 7.5px;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 0.35rem;
-    }
-
-    .metric-val-hero {
-      font-size: 2rem;
-      font-weight: 900;
-      letter-spacing: -0.02em;
-      margin-bottom: 0.5rem;
-      font-family: var(--font-sans);
-    }
-
-    .metric-tag-hero {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      background-color: rgba(255, 255, 255, 0.2);
-      color: #ffffff;
-      padding: 0.2rem 0.65rem;
-      border-radius: 9999px;
-      font-size: 0.74rem;
       font-weight: 700;
+      letter-spacing: 0.04em;
+      border-bottom: 1px solid var(--border);
     }
 
-    .metric-card-white {
-      background-color: #f9fafb;
-      border: 1px solid var(--border-light);
-      border-radius: 1.15rem;
-      padding: 1.25rem;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
+    .trade {
+      min-height: 36px;
+      padding: 0 12px;
+      border-bottom: 1px solid #edf1ef;
+      font-family: var(--mono);
+      font-size: 8.5px;
+      transition: background 0.12s ease;
     }
 
-    .metric-white-title {
-      font-size: 0.75rem;
-      font-weight: 700;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+    .trade:last-child {
+      border-bottom: 0;
     }
 
-    .metric-white-val {
-      font-size: 1.85rem;
-      font-weight: 900;
-      color: var(--text-main);
-      margin: 0.35rem 0;
+    .trade:hover {
+      background: #f7faf8;
     }
 
-    .metric-white-meta {
-      font-size: 0.76rem;
-      font-weight: 700;
-      color: var(--mint-text);
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-    }
-
-    /* COMPACT REAL TAPE EXECUTION STREAM */
-    .stream-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 0.65rem;
-      font-size: 0.78rem;
+    .col-symbol {
       font-weight: 800;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .scalp-stream {
-      display: flex;
-      flex-direction: column;
-      gap: 0.55rem;
-    }
-
-    .scalp-row {
+      color: var(--text);
+      letter-spacing: -0.01em;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      background-color: #f9fafb;
-      border: 1px solid var(--border-light);
-      border-radius: 0.85rem;
-      padding: 0.75rem 1rem;
-      font-size: 0.85rem;
-      transition: background-color 0.15s;
+      gap: 4px;
     }
 
-    .scalp-row:hover {
-      background-color: #f3f4f6;
+    .col-symbol::before {
+      content: "";
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--emerald);
+      display: inline-block;
     }
 
-    .scalp-left {
-      display: flex;
-      align-items: center;
-      gap: 0.65rem;
-    }
-
-    .ticker-symbol {
-      font-weight: 800;
-      color: var(--hero-green);
-      font-size: 0.95rem;
+    .col-side {
+      text-align: center;
     }
 
     .side-pill {
-      font-size: 0.7rem;
-      font-weight: 800;
-      padding: 2px 7px;
-      border-radius: 9999px;
+      display: inline-block;
+      padding: 1.5px 6px;
+      border-radius: 3px;
+      font-size: 7.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
     }
-    .side-buy { background-color: var(--mint-bg); color: var(--mint-text); }
-    .side-short { background-color: var(--rose-bg); color: var(--rose-text); }
+
+    .side-pill.buy {
+      background: var(--mint);
+      color: var(--green);
+    }
+
+    .side-pill.short {
+      background: var(--red-bg);
+      color: var(--red);
+    }
+
+    .col-qty {
+      text-align: right;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .col-entry,
+    .col-exit {
+      text-align: right;
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .col-hold {
+      text-align: right;
+      color: var(--yellow);
+      font-weight: 600;
+    }
+
+    .col-route {
+      text-align: center;
+    }
 
     .route-pill {
-      font-size: 0.72rem;
+      display: inline-block;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: var(--blue-bg);
+      color: var(--blue);
+      font-size: 7.5px;
       font-weight: 700;
-      background-color: #e5e7eb;
-      color: var(--text-muted);
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-family: var(--font-mono);
+      letter-spacing: 0.02em;
     }
 
-    .scalp-right {
+    .col-pnl {
+      text-align: right;
+      font-weight: 700;
+      font-size: 9px;
+    }
+
+    .col-pnl.pos {
+      color: var(--green);
+    }
+
+    .col-pnl.neg {
+      color: var(--red);
+    }
+
+    .table-foot {
       display: flex;
       align-items: center;
-      gap: 1rem;
-      text-align: right;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: #fafbfa;
+      border-top: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 7.5px;
+      color: var(--soft);
     }
 
-    .hold-time-tag {
-      font-size: 0.78rem;
+    .table-foot-stat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .table-foot-live {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--emerald);
       font-weight: 700;
-      color: var(--purple-text);
-      background-color: var(--purple-bg);
-      padding: 2px 7px;
-      border-radius: 6px;
-      font-family: var(--font-mono);
     }
 
-    .profit-val {
-      font-weight: 800;
-      color: var(--mint-text);
-      font-size: 0.95rem;
-      font-family: var(--font-mono);
+    .text-left { text-align: left; }
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+
+    /* =====================================================
+       TRUST STRIP
+    ===================================================== */
+
+    .trust-strip {
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+
+      background: white;
     }
 
-    /* SECTION 2: THE 3 CORE PILLARS (ASYMMETRIC GRID) */
-    .pillars-section {
-      padding: 4.5rem 0;
-      border-top: 1px solid var(--border-light);
-    }
-
-    .section-header {
-      text-align: center;
-      max-width: 680px;
-      margin: 0 auto 3.5rem;
-    }
-
-    .section-header h2 {
-      font-size: 2.25rem;
-      font-weight: 900;
-      letter-spacing: -0.025em;
-      color: var(--text-main);
-      margin-bottom: 0.65rem;
-    }
-
-    .section-header p {
-      color: var(--text-muted);
-      font-size: 1.05rem;
-    }
-
-    .pillars-grid {
+    .trust-grid {
       display: grid;
-      grid-template-columns: 1.25fr 1fr;
-      gap: 2rem;
-      margin-bottom: 2rem;
+      grid-template-columns: repeat(4, 1fr);
     }
 
-    .pillar-card {
-      background-color: #ffffff;
-      border: 1px solid var(--border-light);
-      border-radius: 1.5rem;
-      padding: 2.25rem;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
-      text-align: left;
+    .trust-item {
+      min-height: 78px;
+
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+
+      padding: 0 22px;
+
+      border-right: 1px solid var(--border);
     }
 
-    .pillar-card.featured {
-      background: linear-gradient(145deg, #ffffff 0%, #f9fafb 100%);
-      border-color: rgba(6, 78, 59, 0.2);
+    .trust-item:last-child {
+      border-right: 0;
     }
 
-    .pillar-icon {
-      width: 46px;
-      height: 46px;
-      border-radius: 12px;
-      background-color: var(--mint-bg);
-      color: var(--hero-green);
+    .trust-label {
+      color: var(--soft);
+
+      font-family: var(--mono);
+      font-size: 8px;
+      text-transform: uppercase;
+    }
+
+    .trust-value {
+      margin-top: 3px;
+
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    /* =====================================================
+       PROBLEM SECTION
+    ===================================================== */
+
+    .section {
+      padding: 105px 0;
+    }
+
+    .section-intro {
+      max-width: 700px;
+      margin-bottom: 48px;
+    }
+
+    .kicker {
+      margin-bottom: 12px;
+
+      color: var(--green);
+
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    h2 {
+      font-size: clamp(34px, 4vw, 52px);
+      line-height: 1.08;
+
+      letter-spacing: -.055em;
+      font-weight: 800;
+    }
+
+    .section-description {
+      max-width: 620px;
+
+      margin-top: 16px;
+
+      color: var(--muted);
+
+      font-size: 14px;
+      line-height: 1.8;
+    }
+
+    /* COMPARISON */
+
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+
+      border: 1px solid var(--border-strong);
+      background: white;
+
+      border-radius: 10px;
+
+      overflow: hidden;
+    }
+
+    .comparison-side {
+      padding: 30px;
+    }
+
+    .comparison-side:first-child {
+      background: #fafbfa;
+      border-right: 1px solid var(--border);
+    }
+
+    .comparison-label {
+      color: var(--soft);
+
+      font-family: var(--mono);
+      font-size: 9px;
+      text-transform: uppercase;
+    }
+
+    .comparison-side h3 {
+      margin-top: 8px;
+
+      font-size: 20px;
+      letter-spacing: -.035em;
+    }
+
+    .comparison-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+
+      margin-top: 23px;
+    }
+
+    .comparison-list div {
+      padding: 11px;
+
+      border: 1px solid var(--border);
+
+      border-radius: 5px;
+
+      color: var(--muted);
+
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .comparison-side:last-child .comparison-list div {
+      color: var(--green);
+      background: var(--mint-2);
+      border-color: #d6eee2;
+    }
+
+    /* =====================================================
+       FEATURE SECTION
+    ===================================================== */
+
+    .feature-layout {
+      display: grid;
+      grid-template-columns: .75fr 1.25fr;
+      gap: 65px;
+
+      align-items: start;
+    }
+
+    .feature-list {
+      border-top: 1px solid var(--border);
+    }
+
+    .feature-row {
+      display: grid;
+      grid-template-columns: 45px 1fr;
+      gap: 15px;
+
+      padding: 25px 0;
+
+      border-bottom: 1px solid var(--border);
+    }
+
+    .feature-number {
+      color: var(--green);
+
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 700;
+    }
+
+    .feature-row h3 {
+      font-size: 17px;
+      letter-spacing: -.025em;
+    }
+
+    .feature-row p {
+      margin-top: 7px;
+
+      color: var(--muted);
+
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    /* FEATURE VISUAL */
+
+    .analytics-panel {
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+
+      background: white;
+
+      overflow: hidden;
+
+      box-shadow: 0 15px 35px rgba(23, 48, 39, .06);
+    }
+
+    .analytics-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      padding: 15px 17px;
+
+      border-bottom: 1px solid var(--border);
+    }
+
+    .analytics-head strong {
+      font-size: 12px;
+    }
+
+    .analytics-head span {
+      color: var(--soft);
+
+      font-family: var(--mono);
+      font-size: 8px;
+    }
+
+    .analytics-body {
+      padding: 18px;
+    }
+
+    .chart-title {
+      display: flex;
+      justify-content: space-between;
+
+      color: var(--muted);
+
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .chart {
+      height: 170px;
+
+      display: flex;
+      align-items: end;
+      gap: 9px;
+
+      margin-top: 15px;
+
+      padding: 0 4px;
+
+      border-bottom: 1px solid var(--border);
+    }
+
+    .chart-column {
+      flex: 1;
+
+      position: relative;
+
+      height: 100%;
+
+      display: flex;
+      align-items: end;
+    }
+
+    .chart-bar {
+      width: 100%;
+
+      background: linear-gradient(to top,
+          #ccefe0,
+          var(--emerald));
+
+      border-radius: 3px 3px 0 0;
+    }
+
+    .chart-column:nth-child(1) .chart-bar {
+      height: 43%;
+    }
+
+    .chart-column:nth-child(2) .chart-bar {
+      height: 58%;
+    }
+
+    .chart-column:nth-child(3) .chart-bar {
+      height: 49%;
+    }
+
+    .chart-column:nth-child(4) .chart-bar {
+      height: 76%;
+    }
+
+    .chart-column:nth-child(5) .chart-bar {
+      height: 67%;
+    }
+
+    .chart-column:nth-child(6) .chart-bar {
+      height: 88%;
+    }
+
+    .chart-column:nth-child(7) .chart-bar {
+      height: 71%;
+    }
+
+    .chart-column:nth-child(8) .chart-bar {
+      height: 94%;
+    }
+
+    .chart-labels {
+      display: flex;
+      justify-content: space-between;
+
+      margin-top: 7px;
+
+      color: var(--soft);
+
+      font-family: var(--mono);
+      font-size: 7px;
+    }
+
+    .mini-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+
+      margin-top: 17px;
+    }
+
+    .mini-stat {
+      padding: 12px;
+
+      background: #f8faf9;
+      border: 1px solid var(--border);
+
+      border-radius: 6px;
+    }
+
+    .mini-stat small {
+      color: var(--soft);
+
+      font-family: var(--mono);
+      font-size: 7px;
+      text-transform: uppercase;
+    }
+
+    .mini-stat strong {
+      display: block;
+
+      margin-top: 4px;
+
+      font-family: var(--mono);
+      font-size: 14px;
+    }
+
+    /* =====================================================
+       ROUTES SECTION
+    ===================================================== */
+
+    .route-section {
+      padding: 95px 0;
+
+      background: white;
+
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .route-grid {
+      display: grid;
+      grid-template-columns: .8fr 1.2fr;
+      gap: 70px;
+      align-items: center;
+    }
+
+    .route-table {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+
+      overflow: hidden;
+    }
+
+    .route-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+
+      padding: 14px 16px;
+
+      border-bottom: 1px solid var(--border);
+
+      font-family: var(--mono);
+      font-size: 9px;
+    }
+
+    .route-row:last-child {
+      border-bottom: 0;
+    }
+
+    .route-header {
+      color: var(--soft);
+      background: #f8faf9;
+      font-size: 8px;
+      text-transform: uppercase;
+    }
+
+    .route-name {
+      font-weight: 700;
+    }
+
+    .positive {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    /* =====================================================
+       PRIVACY
+    ===================================================== */
+
+    .privacy {
+      padding: 105px 0;
+    }
+
+    .privacy-box {
+      display: grid;
+      grid-template-columns: .9fr 1.1fr;
+
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+
+      overflow: hidden;
+
+      background: white;
+    }
+
+    .privacy-copy {
+      padding: 42px;
+
+      background: var(--green);
+      color: white;
+    }
+
+    .privacy-copy .kicker {
+      color: #9ce0c2;
+    }
+
+    .privacy-copy h2 {
+      max-width: 390px;
+    }
+
+    .privacy-copy p {
+      max-width: 400px;
+
+      margin-top: 17px;
+
+      color: #c7e8d9;
+
+      font-size: 13px;
+      line-height: 1.8;
+    }
+
+    .privacy-points {
+      display: grid;
+      gap: 12px;
+
+      margin-top: 25px;
+    }
+
+    .privacy-points div {
+      display: flex;
+      gap: 9px;
+      align-items: center;
+
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .privacy-points span {
+      width: 19px;
+      height: 19px;
+
+      display: grid;
+      place-items: center;
+
+      border-radius: 50%;
+
+      background: rgba(255, 255, 255, .14);
+
+      color: white;
+      font-size: 9px;
+    }
+
+    .privacy-diagram {
+      padding: 42px;
+
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 1.25rem;
     }
 
-    .pillar-card h3 {
-      font-size: 1.35rem;
-      font-weight: 800;
-      color: var(--text-main);
-      margin-bottom: 0.65rem;
+    .local-flow {
+      width: 100%;
+      max-width: 420px;
     }
 
-    .pillar-card p {
-      color: var(--text-muted);
-      font-size: 0.95rem;
-      line-height: 1.6;
-      margin-bottom: 1.5rem;
-    }
-
-    /* COMPARISON DIAGRAM: SPEED VS EDGE */
-    .speed-compare-box {
-      background-color: #ffffff;
-      border: 1px solid var(--border-light);
-      border-radius: 1rem;
-      padding: 1rem 1.25rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .compare-row {
+    .flow-item {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      font-size: 0.85rem;
+      gap: 13px;
+
+      padding: 14px;
+
+      border: 1px solid var(--border);
+
+      border-radius: 7px;
+
+      background: #fafcfa;
     }
 
-    .compare-label {
-      font-weight: 700;
-      color: var(--text-main);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
+    .flow-icon {
+      width: 35px;
+      height: 35px;
 
-    .bar-wrap {
-      flex: 1;
-      max-width: 140px;
-      height: 8px;
-      background-color: #e5e7eb;
-      border-radius: 4px;
-      overflow: hidden;
-      margin: 0 1rem;
-    }
-
-    .bar-fill-green {
-      height: 100%;
-      width: 88%;
-      background-color: var(--emerald);
-    }
-
-    .bar-fill-red {
-      height: 100%;
-      width: 36%;
-      background-color: var(--rose-accent);
-    }
-
-    .compare-stat {
-      font-weight: 800;
-      font-family: var(--font-mono);
-    }
-
-    /* TRIO ROW */
-    .pillars-trio {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 2rem;
-    }
+      place-items: center;
 
-    /* WINDOWS DEFENDER & SMARTSCREEN 2-CLICK SETUP */
-    .security-section {
-      padding: 2rem 0 5rem;
-    }
+      background: var(--mint);
 
-    .security-card {
-      background-color: #ffffff;
-      border: 1px solid var(--border-light);
-      border-left: 6px solid var(--hero-green);
-      border-radius: 1.5rem;
-      padding: 2.25rem;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
-      text-align: left;
-    }
-
-    .sec-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 1rem;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .sec-title {
-      font-size: 1.3rem;
-      font-weight: 900;
-      color: var(--text-main);
-      display: flex;
-      align-items: center;
-      gap: 0.65rem;
-    }
-
-    .sec-chip {
-      background-color: var(--mint-bg);
-      color: var(--mint-text);
-      font-size: 0.78rem;
-      font-weight: 800;
-      padding: 3px 10px;
-      border-radius: 9999px;
-    }
-
-    .sec-text {
-      color: var(--text-muted);
-      font-size: 0.95rem;
-      line-height: 1.6;
-      margin-bottom: 1.75rem;
-      max-width: 900px;
-    }
-
-    .steps-duo {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1.5rem;
-    }
-
-    .step-box-clean {
-      background-color: #f9fafb;
-      border: 1px solid var(--border-light);
-      border-radius: 1rem;
-      padding: 1.25rem;
-    }
-
-    .step-box-num {
-      display: inline-block;
-      font-size: 0.75rem;
-      font-weight: 800;
-      color: var(--hero-green);
-      background-color: var(--mint-bg);
-      padding: 2px 8px;
       border-radius: 6px;
-      margin-bottom: 0.5rem;
-    }
 
-    .step-box-heading {
-      font-size: 0.95rem;
+      color: var(--green);
+
+      font-size: 13px;
       font-weight: 800;
-      color: var(--text-main);
-      margin-bottom: 0.4rem;
     }
 
-    .step-box-body {
-      font-size: 0.88rem;
-      color: var(--text-muted);
-      line-height: 1.55;
+    .flow-text strong {
+      display: block;
+      font-size: 11px;
     }
 
-    .step-box-body kbd {
-      background-color: #ffffff;
-      border: 1px solid #d1d5db;
-      border-radius: 4px;
-      padding: 1px 6px;
-      font-size: 0.8rem;
+    .flow-text span {
+      color: var(--soft);
+      font-family: var(--mono);
+      font-size: 8px;
+    }
+
+    .flow-line {
+      width: 1px;
+      height: 22px;
+
+      margin-left: 31px;
+
+      background: var(--border-strong);
+    }
+
+    /* =====================================================
+       INSTALL
+    ===================================================== */
+
+    .install {
+      padding: 95px 0;
+
+      background: #f0f5f2;
+
+      border-top: 1px solid var(--border);
+    }
+
+    .install-grid {
+      display: grid;
+      grid-template-columns: .8fr 1.2fr;
+      gap: 70px;
+    }
+
+    .install-copy h2 {
+      font-size: 38px;
+    }
+
+    .install-copy p {
+      margin-top: 15px;
+
+      color: var(--muted);
+
+      font-size: 13px;
+      line-height: 1.8;
+    }
+
+    .steps {
+      display: grid;
+      gap: 8px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 40px 1fr;
+
+      padding: 17px;
+
+      background: white;
+
+      border: 1px solid var(--border);
+
+      border-radius: 7px;
+    }
+
+    .step-number {
+      color: var(--green);
+
+      font-family: var(--mono);
+      font-size: 10px;
       font-weight: 700;
-      color: var(--text-main);
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     }
 
-    /* FOOTER */
+    .step h3 {
+      font-size: 12px;
+    }
+
+    .step p {
+      margin-top: 5px;
+
+      color: var(--muted);
+
+      font-size: 11px;
+    }
+
+    kbd {
+      padding: 2px 5px;
+
+      background: #f4f6f5;
+
+      border: 1px solid var(--border-strong);
+      border-radius: 3px;
+
+      font-family: var(--mono);
+      font-size: 9px;
+    }
+
+    /* =====================================================
+       CTA
+    ===================================================== */
+
+    .cta {
+      padding: 110px 0;
+
+      text-align: center;
+    }
+
+    .cta h2 {
+      max-width: 700px;
+      margin: auto;
+    }
+
+    .cta p {
+      max-width: 540px;
+      margin: 17px auto 0;
+
+      color: var(--muted);
+
+      font-size: 13px;
+    }
+
+    .cta-actions {
+      display: flex;
+      justify-content: center;
+      gap: 9px;
+      flex-wrap: wrap;
+
+      margin-top: 27px;
+    }
+
+    /* =====================================================
+       FOOTER
+    ===================================================== */
+
     footer {
-      background-color: #ffffff;
-      border-top: 1px solid var(--border-light);
-      padding: 2.5rem 0;
-      font-size: 0.88rem;
-      color: var(--text-muted);
+      padding: 26px 0;
+
+      border-top: 1px solid var(--border);
+
+      background: white;
+
+      color: var(--soft);
+
+      font-size: 10px;
     }
 
     .footer-row {
       display: flex;
-      align-items: center;
       justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 1rem;
+      gap: 20px;
     }
 
-    .footer-link {
-      color: var(--text-muted);
-      text-decoration: none;
-      font-weight: 600;
-      font-size: 0.82rem;
-      transition: color 0.15s;
+    .footer-row a {
+      color: var(--muted);
+      font-family: var(--mono);
     }
 
-    .footer-link:hover {
-      color: var(--hero-green);
+    /* =====================================================
+       RESPONSIVE
+    ===================================================== */
+
+    @media (max-width: 950px) {
+
+      .hero-grid,
+      .feature-layout,
+      .route-grid,
+      .privacy-box,
+      .install-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-grid {
+        gap: 45px;
+      }
+
+      .feature-layout {
+        gap: 40px;
+      }
+
+      .route-grid,
+      .install-grid {
+        gap: 40px;
+      }
+
+      .privacy-copy {
+        padding: 32px;
+      }
+
+      .privacy-diagram {
+        padding: 32px;
+      }
+
+      .nav-links a:not(.nav-download) {
+        display: none;
+      }
     }
 
-    @media (max-width: 1024px) {
-      .hero-split-grid { grid-template-columns: 1fr; gap: 2.5rem; }
-      .pillars-grid { grid-template-columns: 1fr; }
-      .pillars-trio { grid-template-columns: 1fr; }
-      .steps-duo { grid-template-columns: 1fr; }
-      .nav-menu { display: none; }
+    @media (max-width: 700px) {
+
+      .container {
+        width: min(var(--max), calc(100% - 28px));
+      }
+
+      .hero {
+        padding-top: 55px;
+      }
+
+      h1 {
+        font-size: 46px;
+      }
+
+      .metrics {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .metric.main {
+        grid-column: 1 / -1;
+      }
+
+      .table-head,
+      .trade {
+        min-width: 520px;
+      }
+
+      .trade-table {
+        overflow-x: auto;
+      }
+
+      .trust-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .trust-item {
+        border-bottom: 1px solid var(--border);
+      }
+
+      .trust-item:nth-child(2) {
+        border-right: 0;
+      }
+
+      .comparison {
+        grid-template-columns: 1fr;
+      }
+
+      .comparison-side:first-child {
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .comparison-list {
+        grid-template-columns: 1fr;
+      }
+
+      .mini-stats {
+        grid-template-columns: 1fr;
+      }
+
+      .section {
+        padding: 75px 0;
+      }
+
+      .footer-row {
+        flex-direction: column;
+      }
+    }
+
+    @media (max-width: 480px) {
+
+      .hero-actions {
+        flex-direction: column;
+      }
+
+      .button {
+        width: 100%;
+      }
+
+      .metrics {
+        grid-template-columns: 1fr;
+      }
+
+      .metric.main {
+        grid-column: auto;
+      }
+
+      .trust-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .trust-item {
+        border-right: 0;
+      }
     }
   </style>
 </head>
+
 <body>
 
-  <!-- TOP HEADER -->
+  <!-- =========================================================
+     NAVIGATION
+========================================================= -->
+
   <header>
-    <div class="container nav-bar">
-      <a href="#" class="logo-group">
-        <div class="logo-icon">
-          <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-        </div>
-        <div class="logo-text">
-          Hammer Pro <span class="version-tag js-ver-pill">v2.3.0</span>
+    <div class="container nav">
+
+      <a href="#" class="brand">
+        <div class="brand-mark">H</div>
+
+        <div class="brand-name">
+          Hammer Pro
+          <span class="brand-version js-ver-pill">v2.2.0</span>
         </div>
       </a>
 
-      <div class="nav-menu">
-        <a href="#cockpit" class="nav-link">Cockpit Console</a>
-        <a href="#why-switch" class="nav-link">Tape Analytics</a>
-        <a href="#security" class="nav-link">Windows Setup</a>
-        <a id="nav-win-btn" href="https://github.com/Web-Traveller/hammer-pro-journal/releases/download/v2.2.0/Hammer.Pro.Journal_2.2.0_x64-setup.exe" class="nav-download-btn">
-          Download v2.3.0
+      <nav class="nav-links">
+        <a href="#why">Why Hammer</a>
+        <a href="#analytics">Analytics</a>
+        <a href="#privacy">Privacy</a>
+        <a href="#install">Installation</a>
+
+        <a id="nav-win-btn" class="nav-download" href="https://github.com/Web-Traveller/hammer-pro-journal/releases/latest">
+          Download <span class="js-ver-pill">v2.2.0</span>
         </a>
-      </div>
+      </nav>
+
     </div>
   </header>
 
-  <!-- SPLIT COMMAND-CENTER HERO -->
-  <section class="hero-section">
-    <div class="container">
-      <div class="hero-split-grid">
 
-        <!-- LEFT COLUMN: THE VALUE & DOWNLOAD HUB -->
-        <div class="hero-copy">
-          <div class="hero-badge-pill">
-            <span class="pulse-beacon"></span>
-            <span>TAPE EXECUTION ENGINE • <strong class="js-ver-pill">v2.3.0</strong></span>
+  <main>
+
+    <!-- =========================================================
+     HERO
+========================================================= -->
+
+    <section class="hero">
+
+      <div class="container hero-grid">
+
+        <div>
+
+          <div class="eyebrow">
+            <span class="eyebrow-dot"></span>
+            Built for Level 2 &amp; Time &amp; Sales
           </div>
 
-          <h1 class="hero-headline">
-            Your Tape Edge,<br>
-            <span>Quantified</span>.
+          <h1>
+            Your trading day
+            <span>told by the data.</span>
           </h1>
 
-          <p class="hero-subhead">
-            The high-frequency journal built strictly for Level 2 &amp; Time &amp; Sales scalpers. Instant millisecond hold speed analytics, ECN route rebate matrices, and multi-account sandboxes with zero candlestick distraction.
+          <p class="hero-copy">
+            Hammer Pro is a focused trading journal for tape scalpers.
+            Import your executions and see the details that disappear
+            from memory after the session — hold time, route, slippage,
+            fees and real net P&amp;L.
           </p>
 
-          <!-- DIRECT DOWNLOAD ACTIONS -->
-          <div class="action-group">
-            <div class="btn-duo">
-              <a id="btn-win" href="https://github.com/Web-Traveller/hammer-pro-journal/releases/download/v2.2.0/Hammer.Pro.Journal_2.2.0_x64-setup.exe" class="btn-main">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="7 10 12 15 17 10"></polyline>
-                  <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-                <span id="win-btn-text">Download for Windows (.exe)</span>
-              </a>
+          <div class="hero-actions">
 
-              <a id="btn-apk" href="https://github.com/Web-Traveller/hammer-pro-journal/releases/latest" class="btn-secondary">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-                <span>Android (.apk)</span>
-              </a>
-            </div>
-
-            <a id="btn-zip" href="https://github.com/Web-Traveller/hammer-pro-journal/releases/latest" class="btn-zip-link" title="Bypasses Microsoft Edge SmartScreen warning">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 7h10M7 12h10M7 17h10"/></svg>
-              <span>Download as .ZIP (SmartScreen Bypass Option)</span>
+            <a id="btn-win" class="button button-primary" href="https://github.com/Web-Traveller/hammer-pro-journal/releases/latest">
+              <span id="win-btn-text">Download for Windows (.exe)</span>
+              →
             </a>
+
+            <a id="btn-apk" class="button button-secondary"
+              href="https://github.com/Web-Traveller/hammer-pro-journal/releases/latest">
+              Android APK (.apk)
+            </a>
+
+            <a id="btn-zip" class="button button-ghost"
+              href="https://github.com/Web-Traveller/hammer-pro-journal/releases/latest"
+              title="Portable .zip download for instant execution without Windows installer">
+              Portable .ZIP (SmartScreen Bypass) ↓
+            </a>
+
           </div>
 
-          <!-- TRUST POINTS -->
-          <div class="spec-points">
-            <div class="spec-item">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              <span>100% Local-First: Your broker logs stay on your machine</span>
-            </div>
-            <div class="spec-item">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              <span>Sub-Second Velocity: Hold time calculated in seconds and milliseconds</span>
-            </div>
-            <div class="spec-item">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              <span>Zero Broker Credentials Required: Drag and drop your raw exports</span>
-            </div>
+          <div class="hero-trust">
+            <span>Local-first SQLite</span>
+            <span>No broker login</span>
+            <span>Raw trade imports</span>
           </div>
+
         </div>
 
-        <!-- RIGHT COLUMN: LIVE JOURNAL CONSOLE REPLICA -->
-        <div id="cockpit" class="cockpit-card">
-          <div class="cockpit-topbar">
-            <div class="topbar-title">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#064e3b" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-              <span>Hammer Pro Console — Market Session</span>
+
+        <!-- PRODUCT PREVIEW -->
+
+        <div class="app-window">
+
+          <div class="app-top">
+
+            <div class="app-top-left">
+              <div class="window-dots">
+                <span class="win-dot dot-red"></span>
+                <span class="win-dot dot-yellow"></span>
+                <span class="win-dot dot-green"></span>
+              </div>
+              <div class="app-title">
+                <div class="app-title-icon">H</div>
+                <span class="app-title-text">Hammer Pro Journal</span>
+                <span class="app-ver-tag js-ver-pill">v2.2.0</span>
+              </div>
             </div>
-            <span class="topbar-pill">● ACTIVE WORKSPACE</span>
+
+            <div class="session-badge">
+              <span class="pulse-dot"></span>
+              <span>LIVE EXECUTION ENGINE</span>
+            </div>
+
           </div>
 
-          <!-- DUAL METRICS STRIP -->
-          <div class="hero-stat-duo">
-            <div class="metric-card-hero">
-              <div class="metric-label-hero">Net Realized P&amp;L</div>
-              <div class="metric-val-hero">+$2,418.50</div>
-              <div class="metric-tag-hero">
-                <span>+18.4% today (46 Scalps)</span>
+
+          <div class="app-content">
+
+            <div class="workspace-bar">
+
+              <div class="workspace-tabs">
+                <span class="ws-tab active">Tape Scalp Ledger</span>
+                <span class="ws-tab">Hold Velocity</span>
+                <span class="ws-tab">ECN Rebates</span>
               </div>
+
+              <div class="workspace-date">
+                <span class="status-dot-green"></span>
+                TODAY · 09:30 - 16:00 EST
+              </div>
+
             </div>
 
-            <div class="metric-card-white">
-              <div class="metric-white-title">Win Rate &amp; Speed</div>
-              <div class="metric-white-val">82.6%</div>
-              <div class="metric-white-meta">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                <span>3.2s Avg Tape Hold</span>
+
+            <div class="metrics">
+
+              <div class="metric main">
+
+                <div class="metric-header">
+                  <span class="metric-label">Realized Net P&amp;L</span>
+                  <span class="metric-pill">+18.4%</span>
+                </div>
+
+                <div class="metric-value">
+                  +$2,418.50
+                </div>
+
+                <div class="metric-meta">
+                  46 fills · $0.00 slippage
+                </div>
+
               </div>
+
+
+              <div class="metric">
+
+                <div class="metric-header">
+                  <span class="metric-label">Win / Loss Ratio</span>
+                  <span class="metric-pill pill-green">38W · 8L</span>
+                </div>
+
+                <div class="metric-value">
+                  82.6%
+                </div>
+
+                <div class="metric-meta">
+                  Profit factor 3.42
+                </div>
+
+              </div>
+
+
+              <div class="metric">
+
+                <div class="metric-header">
+                  <span class="metric-label">Tape Velocity</span>
+                  <span class="metric-pill pill-neutral">Median 1.8s</span>
+                </div>
+
+                <div class="metric-value">
+                  2.4s
+                </div>
+
+                <div class="metric-meta">
+                  Avg hold duration
+                </div>
+
+              </div>
+
             </div>
+
+
+            <div class="trade-table">
+
+              <div class="table-head">
+                <span class="text-left">Symbol</span>
+                <span class="text-center">Side</span>
+                <span class="text-right">Qty</span>
+                <span class="text-right">Entry</span>
+                <span class="text-right">Exit</span>
+                <span class="text-right">Hold</span>
+                <span class="text-center">Route</span>
+                <span class="text-right">Net P&amp;L</span>
+              </div>
+
+
+              <div class="trade">
+                <span class="col-symbol">NVDA</span>
+                <span class="col-side"><span class="side-pill buy">BUY</span></span>
+                <span class="col-qty">300</span>
+                <span class="col-entry">181.20</span>
+                <span class="col-exit">181.90</span>
+                <span class="col-hold">1.4s</span>
+                <span class="col-route"><span class="route-pill">ARCA</span></span>
+                <span class="col-pnl pos">+$205.80</span>
+              </div>
+
+
+              <div class="trade">
+                <span class="col-symbol">TSLA</span>
+                <span class="col-side"><span class="side-pill short">SHORT</span></span>
+                <span class="col-qty">400</span>
+                <span class="col-entry">247.80</span>
+                <span class="col-exit">246.90</span>
+                <span class="col-hold">4.1s</span>
+                <span class="col-route"><span class="route-pill">EDGX</span></span>
+                <span class="col-pnl pos">+$354.40</span>
+              </div>
+
+
+              <div class="trade">
+                <span class="col-symbol">AMD</span>
+                <span class="col-side"><span class="side-pill buy">BUY</span></span>
+                <span class="col-qty">500</span>
+                <span class="col-entry">167.10</span>
+                <span class="col-exit">167.85</span>
+                <span class="col-hold">2.8s</span>
+                <span class="col-route"><span class="route-pill">NSDQ</span></span>
+                <span class="col-pnl pos">+$367.90</span>
+              </div>
+
+
+              <div class="trade">
+                <span class="col-symbol">SMCI</span>
+                <span class="col-side"><span class="side-pill buy">BUY</span></span>
+                <span class="col-qty">100</span>
+                <span class="col-entry">42.30</span>
+                <span class="col-exit">45.80</span>
+                <span class="col-hold">5.6s</span>
+                <span class="col-route"><span class="route-pill">BATS</span></span>
+                <span class="col-pnl pos">+$347.10</span>
+              </div>
+
+
+              <div class="trade">
+                <span class="col-symbol">META</span>
+                <span class="col-side"><span class="side-pill short">SHORT</span></span>
+                <span class="col-qty">250</span>
+                <span class="col-entry">512.40</span>
+                <span class="col-exit">510.90</span>
+                <span class="col-hold">0.9s</span>
+                <span class="col-route"><span class="route-pill">IEX</span></span>
+                <span class="col-pnl pos">+$372.50</span>
+              </div>
+
+
+              <div class="table-foot">
+                <span class="table-foot-stat">5 tape executions logged · Total Net: <strong style="color:var(--green);margin-left:4px;">+$1,647.70</strong></span>
+                <span class="table-foot-live"><span class="pulse-dot" style="width:5px;height:5px;"></span>0ms IN-MEMORY SQLITE</span>
+              </div>
+
+            </div>
+
           </div>
 
-          <!-- LIVE TAPE EXECUTION STREAM -->
-          <div class="stream-header">
-            <span>Recent Tape Executions</span>
-            <span>Realized P&amp;L</span>
-          </div>
-
-          <div class="scalp-stream">
-            <div class="scalp-row">
-              <div class="scalp-left">
-                <span class="ticker-symbol">NVDA</span>
-                <span class="side-pill side-buy">BUY 300</span>
-                <span class="route-pill">ARCA</span>
-              </div>
-              <div class="scalp-right">
-                <span class="hold-time-tag">1.4s hold</span>
-                <span class="profit-val">+$210.00</span>
-              </div>
-            </div>
-
-            <div class="scalp-row">
-              <div class="scalp-left">
-                <span class="ticker-symbol">TSLA</span>
-                <span class="side-pill side-short">SHORT 400</span>
-                <span class="route-pill">EDGX</span>
-              </div>
-              <div class="scalp-right">
-                <span class="hold-time-tag">4.1s hold</span>
-                <span class="profit-val">+$360.00</span>
-              </div>
-            </div>
-
-            <div class="scalp-row">
-              <div class="scalp-left">
-                <span class="ticker-symbol">AMD</span>
-                <span class="side-pill side-buy">BUY 500</span>
-                <span class="route-pill">NSDQ</span>
-              </div>
-              <div class="scalp-right">
-                <span class="hold-time-tag">2.8s hold</span>
-                <span class="profit-val">+$375.00</span>
-              </div>
-            </div>
-
-            <div class="scalp-row">
-              <div class="scalp-left">
-                <span class="ticker-symbol">SMCI</span>
-                <span class="side-pill side-buy">BUY 100</span>
-                <span class="route-pill">BATS</span>
-              </div>
-              <div class="scalp-right">
-                <span class="hold-time-tag">5.6s hold</span>
-                <span class="profit-val">+$350.00</span>
-              </div>
-            </div>
-          </div>
         </div>
 
       </div>
-    </div>
-  </section>
 
-  <!-- SECTION 2: THE 3 CORE PILLARS (ASYMMETRIC GRID) -->
-  <section id="why-switch" class="pillars-section">
-    <div class="container">
-      <div class="section-header">
-        <h2>Designed Specifically for Tape Execution</h2>
-        <p>Traditional journals were built for swing traders looking at 5-minute charts. Hammer Pro is built for scalpers who live in Level 2 depth.</p>
+    </section>
+
+
+    <!-- =========================================================
+     QUICK FACTS
+========================================================= -->
+
+    <section class="trust-strip">
+
+      <div class="container trust-grid">
+
+        <div class="trust-item">
+          <span class="trust-label">Designed for</span>
+          <span class="trust-value">Tape scalpers</span>
+        </div>
+
+        <div class="trust-item">
+          <span class="trust-label">Data source</span>
+          <span class="trust-value">Your trade exports</span>
+        </div>
+
+        <div class="trust-item">
+          <span class="trust-label">Storage</span>
+          <span class="trust-value">Your machine</span>
+        </div>
+
+        <div class="trust-item">
+          <span class="trust-label">Accounts</span>
+          <span class="trust-value">Multiple workspaces</span>
+        </div>
+
       </div>
 
-      <div class="pillars-grid">
-        <!-- FEATURED PILLAR: SPEED VS EDGE -->
-        <div class="pillar-card featured">
-          <div class="pillar-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    </section>
+
+
+    <!-- =========================================================
+     WHY
+========================================================= -->
+
+    <section id="why" class="section">
+
+      <div class="container">
+
+        <div class="section-intro">
+
+          <div class="kicker">
+            The problem
           </div>
-          <h3>Sub-Second Hold Velocity Analytics</h3>
-          <p>
-            Are your best trades fast tape reads, or are you holding losers too long hoping they bounce? Hammer Pro automatically categorizes your trades by execution hold time so you can mathematically identify your bail point.
+
+          <h2>
+            A five-minute journal
+            misses a five-second trade.
+          </h2>
+
+          <p class="section-description">
+            Most trading journals were designed around setups,
+            screenshots and end-of-day P&amp;L. That's not enough when
+            your trade can be over before a candle even finishes.
           </p>
 
-          <div class="speed-compare-box">
-            <div class="compare-row">
-              <div class="compare-label">
-                <span>Hold &lt; 5 seconds</span>
-              </div>
-              <div class="bar-wrap">
-                <div class="bar-fill-green"></div>
-              </div>
-              <div class="compare-stat" style="color: var(--mint-text);">88% Win Rate</div>
-            </div>
-
-            <div class="compare-row">
-              <div class="compare-label">
-                <span>Hold &gt; 30 seconds</span>
-              </div>
-              <div class="bar-wrap">
-                <div class="bar-fill-red"></div>
-              </div>
-              <div class="compare-stat" style="color: var(--rose-accent);">36% Win Rate</div>
-            </div>
-          </div>
         </div>
 
-        <!-- PILLAR 2: ECN ROUTE INTELLIGENCE -->
-        <div class="pillar-card">
-          <div class="pillar-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+
+        <div class="comparison">
+
+          <div class="comparison-side">
+
+            <div class="comparison-label">
+              Typical journal
+            </div>
+
+            <h3>
+              What happened?
+            </h3>
+
+            <div class="comparison-list">
+
+              <div>Entry</div>
+              <div>Exit</div>
+              <div>Setup</div>
+              <div>Daily P&amp;L</div>
+
+            </div>
+
           </div>
-          <h3>ECN Route &amp; Fee Breakdown</h3>
-          <p>
-            Stop guessing your true net edge. Track maker rebates vs taker fees across ARCA, EDGX, NSDQ, and BATS. Understand whether you are making money on liquidity adds or giving it back to spread slippage.
+
+
+          <div class="comparison-side">
+
+            <div class="comparison-label">
+              Hammer Pro
+            </div>
+
+            <h3>
+              Why did it happen?
+            </h3>
+
+            <div class="comparison-list">
+
+              <div>Hold time</div>
+              <div>Execution route</div>
+              <div>Slippage</div>
+              <div>Fees &amp; rebates</div>
+              <div>Long / short</div>
+              <div>Net P&amp;L</div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- =========================================================
+     ANALYTICS
+========================================================= -->
+
+    <section id="analytics" class="section" style="padding-top:0;">
+
+      <div class="container feature-layout">
+
+        <div>
+
+          <div class="kicker">
+            Execution analytics
+          </div>
+
+          <h2>
+            Find the speed
+            where you trade best.
+          </h2>
+
+          <p class="section-description">
+            Your edge might live in a two-second read — or disappear
+            when you hold for thirty. Hammer Pro makes that difference
+            visible.
           </p>
-          <div style="font-size: 0.84rem; font-weight: 700; color: var(--blue-text); background-color: var(--blue-bg); padding: 0.65rem 1rem; border-radius: 8px;">
-            ✓ Automatic liquidity maker rebate calculation
+
+
+          <div class="feature-list">
+
+            <div class="feature-row">
+
+              <div class="feature-number">
+                01
+              </div>
+
+              <div>
+                <h3>Measure every hold</h3>
+
+                <p>
+                  Group executions by duration and see where your
+                  win rate and expectancy change.
+                </p>
+              </div>
+
+            </div>
+
+
+            <div class="feature-row">
+
+              <div class="feature-number">
+                02
+              </div>
+
+              <div>
+                <h3>Separate gross from net</h3>
+
+                <p>
+                  See what remains after commissions, route fees,
+                  rebates and execution costs.
+                </p>
+              </div>
+
+            </div>
+
+
+            <div class="feature-row">
+
+              <div class="feature-number">
+                03
+              </div>
+
+              <div>
+                <h3>Compare the way you trade</h3>
+
+                <p>
+                  Analyze symbols, direction, accounts and execution
+                  behavior instead of relying on memory.
+                </p>
+              </div>
+
+            </div>
+
           </div>
+
         </div>
+
+
+        <!-- ANALYTICS MOCKUP -->
+
+        <div class="analytics-panel">
+
+          <div class="analytics-head">
+            <strong>Performance by hold time</strong>
+            <span>46 TRADES</span>
+          </div>
+
+          <div class="analytics-body">
+
+            <div class="chart-title">
+              <span>Win rate</span>
+              <span style="color:var(--green)">82.6% overall</span>
+            </div>
+
+
+            <div class="chart">
+
+              <div class="chart-column">
+                <div class="chart-bar"></div>
+              </div>
+
+              <div class="chart-column">
+                <div class="chart-bar"></div>
+              </div>
+
+              <div class="chart-column">
+                <div class="chart-bar"></div>
+              </div>
+
+              <div class="chart-column">
+                <div class="chart-bar"></div>
+              </div>
+
+              <div class="chart-column">
+                <div class="chart-bar"></div>
+              </div>
+
+              <div class="chart-column">
+                <div class="chart-bar"></div>
+              </div>
+
+              <div class="chart-column">
+                <div class="chart-bar"></div>
+              </div>
+
+              <div class="chart-column">
+                <div class="chart-bar"></div>
+              </div>
+
+            </div>
+
+
+            <div class="chart-labels">
+              <span>&lt;1s</span>
+              <span>2s</span>
+              <span>5s</span>
+              <span>10s</span>
+              <span>15s</span>
+              <span>30s</span>
+              <span>1m</span>
+              <span>5m+</span>
+            </div>
+
+
+            <div class="mini-stats">
+
+              <div class="mini-stat">
+                <small>Best range</small>
+                <strong>1–5s</strong>
+              </div>
+
+              <div class="mini-stat">
+                <small>Avg winner</small>
+                <strong>2.4s</strong>
+              </div>
+
+              <div class="mini-stat">
+                <small>Avg loser</small>
+                <strong>8.7s</strong>
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
       </div>
 
-      <!-- TRIO ROW -->
-      <div class="pillars-trio">
-        <div class="pillar-card">
-          <div class="pillar-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    </section>
+
+
+    <!-- =========================================================
+     ROUTES
+========================================================= -->
+
+    <section class="route-section">
+
+      <div class="container route-grid">
+
+        <div>
+
+          <div class="kicker">
+            Execution costs
           </div>
-          <h3>100% Local-First Privacy</h3>
-          <p>All broker logs, trade history, and notes live directly on your hard drive. Zero broker passwords required, and no data harvesting.</p>
+
+          <h2>
+            Your gross P&amp;L
+            isn't the whole story.
+          </h2>
+
+          <p class="section-description">
+            A profitable execution can look very different after fees,
+            rebates and slippage. Track where your execution costs are
+            coming from and understand your real net result.
+          </p>
+
         </div>
 
-        <div class="pillar-card">
-          <div class="pillar-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+
+        <div class="route-table">
+
+          <div class="route-row route-header">
+            <span>Route</span>
+            <span>Fees / rebates</span>
+            <span>Net impact</span>
           </div>
-          <h3>Multi-Account Workspaces</h3>
-          <p>Isolate your Premarket scalps, Prop firm accounts, and Cash accounts into separate sandboxes with independent metrics.</p>
+
+          <div class="route-row">
+            <span class="route-name">ARCA</span>
+            <span>+$42.10</span>
+            <span class="positive">+$42.10</span>
+          </div>
+
+          <div class="route-row">
+            <span class="route-name">EDGX</span>
+            <span>-$18.40</span>
+            <span class="positive">-$18.40</span>
+          </div>
+
+          <div class="route-row">
+            <span class="route-name">NSDQ</span>
+            <span>-$11.20</span>
+            <span class="positive">-$11.20</span>
+          </div>
+
+          <div class="route-row">
+            <span class="route-name">BATS</span>
+            <span>+$7.60</span>
+            <span class="positive">+$7.60</span>
+          </div>
+
         </div>
 
-        <div class="pillar-card">
-          <div class="pillar-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          </div>
-          <h3>Zero Candlestick Distractions</h3>
-          <p>No multi-indicator clutter or lagging moving averages. Designed purely for tape readers who trade the order book.</p>
-        </div>
       </div>
-    </div>
-  </section>
 
-  <!-- SECTION 3: WINDOWS 10 / 11 2-CLICK SETUP (SOLVES USER SMART SCREEN ISSUE) -->
-  <section id="security" class="security-section">
-    <div class="container">
-      <div class="security-card">
-        <div class="sec-header">
-          <div class="sec-title">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#064e3b" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            <span>Windows 10 / 11 Installation Guide</span>
+    </section>
+
+
+    <!-- =========================================================
+     PRIVACY
+========================================================= -->
+
+    <section id="privacy" class="privacy">
+
+      <div class="container">
+
+        <div class="privacy-box">
+
+          <div class="privacy-copy">
+
+            <div class="kicker">
+              Local first
+            </div>
+
+            <h2>
+              Your trading history
+              stays with you.
+            </h2>
+
+            <p>
+              Hammer Pro doesn't need your broker password or a cloud
+              account. Bring your exported executions into the journal
+              and keep your trading history on your own machine.
+            </p>
+
+
+            <div class="privacy-points">
+
+              <div>
+                <span>✓</span>
+                No broker credentials
+              </div>
+
+              <div>
+                <span>✓</span>
+                Local trade history
+              </div>
+
+              <div>
+                <span>✓</span>
+                Import raw exports
+              </div>
+
+            </div>
+
           </div>
-          <span class="sec-chip">✓ Verified Safe • Zero Adware • Local-First</span>
+
+
+          <div class="privacy-diagram">
+
+            <div class="local-flow">
+
+              <div class="flow-item">
+
+                <div class="flow-icon">
+                  CSV
+                </div>
+
+                <div class="flow-text">
+                  <strong>Broker export</strong>
+                  <span>raw execution file</span>
+                </div>
+
+              </div>
+
+
+              <div class="flow-line"></div>
+
+
+              <div class="flow-item">
+
+                <div class="flow-icon">
+                  H
+                </div>
+
+                <div class="flow-text">
+                  <strong>Hammer Pro</strong>
+                  <span>local journal &amp; analytics</span>
+                </div>
+
+              </div>
+
+
+              <div class="flow-line"></div>
+
+
+              <div class="flow-item">
+
+                <div class="flow-icon">
+                  ✓
+                </div>
+
+                <div class="flow-text">
+                  <strong>Your machine</strong>
+                  <span>data stays local</span>
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
         </div>
 
-        <p class="sec-text">
-          Because Hammer Pro Journal is an indie desktop trading application without a $500/year corporate signature from Microsoft, Edge and Windows Defender SmartScreen may display a generic <em>"Not commonly downloaded"</em> prompt. The software is 100% clean, privacy-focused, and runs entirely on your local PC.
+      </div>
+
+    </section>
+
+
+    <!-- =========================================================
+     INSTALLATION
+========================================================= -->
+
+    <section id="install" class="install">
+
+      <div class="container install-grid">
+
+        <div class="install-copy">
+
+          <div class="kicker">
+            Windows installation
+          </div>
+
+          <h2>
+            One download.
+            A few clicks.
+          </h2>
+
+          <p>
+            Because Hammer Pro is independently distributed, Windows
+            SmartScreen may display a warning when you first download
+            the installer.
+          </p>
+
+          <p>
+            The warning is related to application reputation and
+            signing, not a Hammer Pro login requirement.
+          </p>
+
+        </div>
+
+
+        <div class="steps">
+
+          <div class="step">
+
+            <div class="step-number">
+              01
+            </div>
+
+            <div>
+              <h3>Keep the download</h3>
+
+              <p>
+                In Microsoft Edge, open the download menu and choose
+                <kbd>Keep</kbd>.
+              </p>
+            </div>
+
+          </div>
+
+
+          <div class="step">
+
+            <div class="step-number">
+              02
+            </div>
+
+            <div>
+              <h3>Choose Keep anyway</h3>
+
+              <p>
+                If Edge displays a download warning, select
+                <kbd>Keep anyway</kbd>.
+              </p>
+            </div>
+
+          </div>
+
+
+          <div class="step">
+
+            <div class="step-number">
+              03
+            </div>
+
+            <div>
+              <h3>Run the installer</h3>
+
+              <p>
+                Open the downloaded file. If SmartScreen appears,
+                select <kbd>More info</kbd> and then
+                <kbd>Run anyway</kbd>.
+              </p>
+            </div>
+
+          </div>
+
+
+          <div class="step">
+
+            <div class="step-number">
+              04
+            </div>
+
+            <div>
+              <h3>Import your executions</h3>
+
+              <p>
+                Open Hammer Pro and bring in your broker's exported
+                trade history.
+              </p>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- =========================================================
+     FINAL CTA
+========================================================= -->
+
+    <section class="cta">
+
+      <div class="container">
+
+        <div class="kicker">
+          Hammer Pro Journal
+        </div>
+
+        <h2>
+          Stop relying on memory
+          after the close.
+        </h2>
+
+        <p>
+          Measure your speed. Understand your execution.
+          Know your real net result.
         </p>
 
-        <div class="steps-duo">
-          <div class="step-box-clean">
-            <span class="step-box-num">Step 1 • In Microsoft Edge</span>
-            <div class="step-box-heading">Unblock Download</div>
-            <div class="step-box-body">
-              Hover over download &rarr; Click <kbd>...</kbd> &rarr; Select <kbd>Keep</kbd> &rarr; Click <kbd>Keep anyway</kbd>.
-            </div>
-          </div>
 
-          <div class="step-box-clean">
-            <span class="step-box-num">Step 2 • In Windows Defender</span>
-            <div class="step-box-heading">Run Setup</div>
-            <div class="step-box-body">
-              When the blue prompt opens, click <kbd>More info</kbd> &rarr; Click <kbd>Run anyway</kbd>.
-            </div>
-          </div>
+        <div class="cta-actions">
+
+          <a id="cta-win-btn" class="button button-primary" href="https://github.com/Web-Traveller/hammer-pro-journal/releases/latest">
+            Download Hammer Pro <span class="js-ver-pill">v2.2.0</span> →
+          </a>
+
         </div>
-      </div>
-    </div>
-  </section>
 
-  <!-- FOOTER: ONLY ONE SINGLE DISCRETE GITHUB LINK -->
+      </div>
+
+    </section>
+
+  </main>
+
+
+  <!-- =========================================================
+     FOOTER
+========================================================= -->
+
   <footer>
+
     <div class="container footer-row">
-      <div>&copy; 2026 Hammer Pro Journal. Built for tape scalpers.</div>
-      <a href="https://github.com/Web-Traveller/hammer-pro-journal" target="_blank" rel="noopener noreferrer" class="footer-link">
-        Open Source Engine on GitHub
+
+      <span>
+        © 2026 Hammer Pro Journal
+      </span>
+
+      <a href="https://github.com/Web-Traveller/hammer-pro-journal" target="_blank" rel="noopener noreferrer">
+        Open source on GitHub ↗
       </a>
+
     </div>
+
   </footer>
 
-  <!-- STEALTH AUTO-UPDATE SCRIPT -->
   <script>
-    (function() {
+    (function () {
       const API_URL = 'https://api.github.com/repos/Web-Traveller/hammer-pro-journal/releases/latest';
+      const FALLBACK_URL = 'https://raw.githubusercontent.com/Web-Traveller/hammer-pro-journal/main/latest.json';
 
       async function syncLatestBuild() {
         try {
-          const res = await fetch(API_URL);
-          if (res.ok) {
-            const data = await res.json();
-            const tag = data.tag_name || 'v2.3.0';
-
-            document.querySelectorAll('.js-ver-pill').forEach(el => el.textContent = tag);
-            const navBtn = document.getElementById('nav-win-btn');
-            if (navBtn) navBtn.textContent = `Download ${tag}`;
-            const winText = document.getElementById('win-btn-text');
-            if (winText) winText.textContent = `Download for Windows (.exe)`;
-
-            const assets = data.assets || [];
-            const winAsset = assets.find(a => a.name.endsWith('.exe') || a.name.endsWith('.msi'));
-            const apkAsset = assets.find(a => a.name.endsWith('.apk'));
-            const zipAsset = assets.find(a => a.name.endsWith('.zip'));
-
-            if (winAsset) {
-              document.getElementById('btn-win').href = winAsset.browser_download_url;
-              if (navBtn) navBtn.href = winAsset.browser_download_url;
+          let data = null;
+          try {
+            const res = await fetch(API_URL);
+            if (res.ok) {
+              data = await res.json();
             }
-            if (apkAsset) {
-              document.getElementById('btn-apk').href = apkAsset.browser_download_url;
-            }
-            if (zipAsset) {
-              document.getElementById('btn-zip').href = zipAsset.browser_download_url;
+          } catch (apiErr) {
+            console.warn('GitHub API rate limited or unreachable, trying fallback manifest...', apiErr);
+          }
+
+          if (!data) {
+            const fbRes = await fetch(FALLBACK_URL);
+            if (fbRes.ok) {
+              data = await fbRes.json();
             }
           }
-        } catch (e) {
-          // Seamless fallback
+
+          if (!data) return;
+
+          const rawTag = data.tag_name || data.version || 'v2.2.0';
+          const tag = rawTag.startsWith('v') ? rawTag : `v${rawTag}`;
+
+          // Update all version pills across the page
+          document.querySelectorAll('.js-ver-pill').forEach(el => {
+            el.textContent = tag;
+          });
+
+          const navBtn = document.getElementById('nav-win-btn');
+          if (navBtn) {
+            navBtn.innerHTML = `Download <span class="js-ver-pill">${tag}</span>`;
+          }
+
+          const winText = document.getElementById('win-btn-text');
+          if (winText) {
+            winText.textContent = `Download for Windows (.exe)`;
+          }
+
+          const ctaBtn = document.getElementById('cta-win-btn');
+          if (ctaBtn) {
+            ctaBtn.innerHTML = `Download Hammer Pro ${tag} →`;
+          }
+
+          const assets = data.assets || [];
+          const winAsset = assets.find(a => a.name && (a.name.endsWith('.exe') || a.name.endsWith('.msi')));
+          const apkAsset = assets.find(a => a.name && a.name.endsWith('.apk'));
+          const zipAsset = assets.find(a => a.name && a.name.endsWith('.zip')) || assets.find(a => a.name && a.name.endsWith('.msi'));
+
+          if (winAsset) {
+            const winBtn = document.getElementById('btn-win');
+            if (winBtn) winBtn.href = winAsset.browser_download_url;
+            if (navBtn) navBtn.href = winAsset.browser_download_url;
+            if (ctaBtn) ctaBtn.href = winAsset.browser_download_url;
+          }
+          if (apkAsset) {
+            const apkBtn = document.getElementById('btn-apk');
+            if (apkBtn) apkBtn.href = apkAsset.browser_download_url;
+          }
+          if (zipAsset) {
+            const zipBtn = document.getElementById('btn-zip');
+            if (zipBtn) zipBtn.href = zipAsset.browser_download_url;
+          }
+        } catch (err) {
+          console.error('Failed to sync latest build:', err);
         }
       }
 
       syncLatestBuild();
     })();
   </script>
+
 </body>
+
 </html>
