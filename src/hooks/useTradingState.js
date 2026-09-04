@@ -18,6 +18,7 @@ import {
   getActiveUserProfile,
   subscribeSyncStatus,
   executeTwoTierSync,
+  refreshUserProfile,
   fetchOnDemandSessionLog,
   deleteSessionFromCloud
 } from '../services/authService';
@@ -267,6 +268,12 @@ export function useTradingState() {
           ) {
             return prev;
           }
+          // If upgraded to cloud sync, trigger immediate sync
+          if (prev && !prev.canCloudSync && statusPayload.profile.canCloudSync) {
+            setTimeout(() => {
+              executeTwoTierSync({}, { force: true });
+            }, 150);
+          }
           return statusPayload.profile;
         });
       }
@@ -320,10 +327,18 @@ export function useTradingState() {
       if (now - lastFocusSyncTime < 60000) return;
       lastFocusSyncTime = now;
 
-      const p = getActiveUserProfile();
-      if (p && p.canCloudSync === true) {
-        executeTwoTierSync();
-      }
+      // Refresh latest profile entitlements on focus (e.g. admin enabled cloud sync)
+      refreshUserProfile().then(refreshed => {
+        const p = refreshed || getActiveUserProfile();
+        if (p && p.canCloudSync === true) {
+          executeTwoTierSync();
+        }
+      }).catch(() => {
+        const p = getActiveUserProfile();
+        if (p && p.canCloudSync === true) {
+          executeTwoTierSync();
+        }
+      });
     };
     window.addEventListener('focus', handleWindowFocus);
     return () => window.removeEventListener('focus', handleWindowFocus);
@@ -344,7 +359,7 @@ export function useTradingState() {
     };
   }, []);
 
-  // Version Gate & Expiry Checker + Broadcast Announcement
+  // Version Gate & Expiry Checker + Broadcast Announcement + Profile Entitlements Refresh
   useEffect(() => {
     checkAppVersionStatus().then(status => {
       if (status) setVersionStatus(status);
@@ -352,6 +367,12 @@ export function useTradingState() {
     fetchActiveBroadcast().then(b => {
       if (b) setActiveBroadcast(b);
     });
+    // Check and refresh user profile entitlements silently from Supabase on startup
+    refreshUserProfile().then(refreshed => {
+      if (refreshed && refreshed.canCloudSync) {
+        executeTwoTierSync({}, { force: true });
+      }
+    }).catch(() => {});
   }, []);
 
   // Licensing & Access Checker

@@ -290,6 +290,10 @@ export async function refreshUserProfile() {
       .eq('id', current.id)
       .maybeSingle();
 
+    if (error) {
+      console.warn('refreshUserProfile fetch note:', error);
+    }
+
     if (!error && dbProfile) {
       const hasChanges = (
         current.canCloudSync !== (dbProfile.can_cloud_sync ?? false) ||
@@ -310,7 +314,7 @@ export async function refreshUserProfile() {
           isBlocked: dbProfile.is_blocked ?? false,
           avatarUrl: dbProfile.avatar_url || current.avatarUrl
         };
-        saveActiveUserProfile(updated, false);
+        saveActiveUserProfile(updated, true);
         return updated;
       }
     }

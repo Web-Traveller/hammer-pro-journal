@@ -91,7 +91,7 @@ export async function checkLicenseAndAccess(userProfile = null) {
     if (profile && profile.id) {
       const { data: dbProfile } = await supabase
         .from('user_profiles')
-        .select('is_blocked, can_cloud_sync, daily_image_limit')
+        .select('is_blocked, can_cloud_sync, daily_image_limit, plan_tier')
         .eq('id', profile.id)
         .maybeSingle();
 
@@ -106,10 +106,14 @@ export async function checkLicenseAndAccess(userProfile = null) {
 
       // Update cached profile entitlements if fetched
       if (dbProfile) {
-        profile.canCloudSync = dbProfile.can_cloud_sync ?? false;
-        profile.dailyImageLimit = dbProfile.daily_image_limit ?? 0;
-        profile.isBlocked = dbProfile.is_blocked ?? false;
-        saveActiveUserProfile(profile);
+        const updatedProfile = {
+          ...profile,
+          canCloudSync: dbProfile.can_cloud_sync ?? false,
+          dailyImageLimit: dbProfile.daily_image_limit ?? 0,
+          planTier: dbProfile.plan_tier || profile.planTier || 'free',
+          isBlocked: dbProfile.is_blocked ?? false
+        };
+        saveActiveUserProfile(updatedProfile, true);
       }
     }
 

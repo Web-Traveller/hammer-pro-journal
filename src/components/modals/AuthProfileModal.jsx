@@ -67,6 +67,9 @@ export function AuthProfileModal({
         refreshUserProfile().then((refreshed) => {
           if (refreshed && refreshed.id) {
             setProfile(refreshed);
+            if (onProfileUpdated) {
+              onProfileUpdated(refreshed);
+            }
           }
         }).catch(() => {});
       } else {
