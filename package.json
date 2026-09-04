@@ -1,7 +1,7 @@
 {
-  "name": "tauri-app",
+  "name": "hammer-pro-journal",
   "private": true,
-  "version": "2.3.0",
+  "version": "2.3.1",
   "type": "module",
   "scripts": {
     "start": "vite",

@@ -1,11 +1,11 @@
 {
-  "version": "2.3.0",
-  "notes": "Hammer Pro Journal v2.3.0: Full Cloudflare R2 Sync, Mobile Terminal, and Tape Analytics",
+  "version": "2.3.1",
+  "notes": "Hammer Pro Journal v2.3.1: Reactive Entitlement Sync, Instant Pro Cloud Activation, and Cloudflare R2 Sync",
   "pub_date": "2026-09-04T00:00:00Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVScGh6OStMM2FBUVYvYWNtSUY0NW9WWG1PaVFGdnZ6bWo5YVQ0SUl4enZqemFkVlJoY1hNYTN3N2ZMYTYveWF4MzFzb3kyVHdPbjNJdHA3cWZCTW42QXhibDE0QjNDRUFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4NDg3NjUzCWZpbGU6SGFtbWVyIFBybyBKb3VybmFsXzIuMy4wX3g2NC1zZXR1cC5leGUKdXNZR2ZMVWNQdCtmL1MrQWhKSVVGRTF0VEpVR1QxRWJqVGJMMmxrd2w1S1AwdnlaSFJsWmVQd1hOZDBoS2R3OWM5WE1pclpNdjBVTlM1MGQreXNhRGc9PQo=",
-      "url": "https://github.com/Web-Traveller/hammer-pro-journal/releases/download/v2.3.0/Hammer.Pro.Journal_2.3.0_x64-setup.exe"
+      "signature": "",
+      "url": "https://github.com/Web-Traveller/hammer-pro-journal/releases/download/v2.3.1/Hammer.Pro.Journal_2.3.1_x64-setup.exe"
     }
   }
 }
