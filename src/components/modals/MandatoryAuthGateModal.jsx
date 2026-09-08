@@ -19,8 +19,6 @@ import {
 import { supabase } from '../../services/supabaseClient';
 
 export function MandatoryAuthGateModal({ isOpen = false, onAuthenticated, onToast }) {
-  if (!isOpen) return null;
-
   const [mode, setMode] = useState('signin'); // 'signin' | 'signup' | 'forgot'
   const [loading, setLoading] = useState(false);
   const [nameInput, setNameInput] = useState('');
@@ -31,6 +29,19 @@ export function MandatoryAuthGateModal({ isOpen = false, onAuthenticated, onToas
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Lock body scroll whenever the gate modal is open
+  useEffect(() => {
+    if (isOpen) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
 
   const clearMessages = () => {
     setErrorMessage('');
@@ -140,13 +151,16 @@ export function MandatoryAuthGateModal({ isOpen = false, onAuthenticated, onToas
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.88)',
-        backdropFilter: 'blur(12px)',
+        backgroundColor: 'rgba(15, 23, 42, 0.45)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
         zIndex: 99999,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         padding: '1.25rem',
+        overflowY: 'auto',
+        overscrollBehavior: 'contain',
         fontFamily: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif"
       }}
     >

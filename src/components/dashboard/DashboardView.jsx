@@ -119,12 +119,12 @@ export function DashboardView({
         <div className="card">
           <div className="card-top">
             <span className="card-title">Overall Win Rate</span>
-            <button className="card-icon-btn"><Percent size={16} color="var(--hero-green)" /></button>
+            <button className="card-icon-btn card-icon-win"><Percent size={16} /></button>
           </div>
           <div className="card-value" style={{ color: 'var(--hero-green)' }}>
             {(filteredDashboardAnalytics.winRate || 0).toFixed(2)}%
           </div>
-          <span className="card-footer-tag" style={{ backgroundColor: '#f3f4f6', color: '#374151' }}>
+          <span className="card-footer-tag">
             Profit Factor: <strong style={{ marginLeft: '4px', color: 'var(--hero-green)' }}>{(filteredDashboardAnalytics.profitFactor || 0).toFixed(2)}</strong>
           </span>
         </div>
@@ -133,10 +133,10 @@ export function DashboardView({
         <div className="card">
           <div className="card-top">
             <span className="card-title">Total Trades Closed</span>
-            <button className="card-icon-btn"><FileText size={16} /></button>
+            <button className="card-icon-btn card-icon-trades"><FileText size={16} /></button>
           </div>
           <div className="card-value">{filteredDashboardAnalytics.totalTrades || 0}</div>
-          <span className="card-footer-tag" style={{ backgroundColor: '#f3f4f6', color: '#374151' }}>
+          <span className="card-footer-tag">
             {filteredDashboardAnalytics.roundTripShares || 0} Round-Trip Shares
           </span>
         </div>
@@ -145,10 +145,10 @@ export function DashboardView({
         <div className="card">
           <div className="card-top">
             <span className="card-title">Avg Hold Duration</span>
-            <button className="card-icon-btn"><Clock size={16} /></button>
+            <button className="card-icon-btn card-icon-clock"><Clock size={16} /></button>
           </div>
           <div className="card-value">{formatHoldTime(filteredDashboardAnalytics.avgHoldTime || 0)}</div>
-          <span className="card-footer-tag" style={{ backgroundColor: '#f3f4f6', color: '#374151' }}>
+          <span className="card-footer-tag">
             Average Position Hold
           </span>
         </div>

@@ -8,7 +8,7 @@
  */
 
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { fetchAppConfig } from './supabaseClient';
+import { fetchAppConfig } from './supabaseClient.js';
 
 export let R2_ACCOUNT_ID = '76cdb43cd04ce3235b092defe0eeaeac';
 export let R2_BUCKET = 'hammer-pro-journal';
@@ -51,10 +51,10 @@ function getR2Client() {
 /**
  * Upload Master Journal Snapshot to Cloudflare R2
  */
-export async function uploadMasterSnapshot(userId, snapshotData) {
+export async function uploadMasterSnapshot(userId, accountId = 'default', snapshotData) {
   if (!userId || !snapshotData) return null;
   await ensureR2Config();
-  const key = `users/${userId}/journal_snapshot.json`;
+  const key = `users/${userId}/${accountId}/journal_snapshot.json`;
 
   try {
     const client = getR2Client();
@@ -78,10 +78,10 @@ export async function uploadMasterSnapshot(userId, snapshotData) {
 /**
  * Download Master Journal Snapshot from Cloudflare R2
  */
-export async function downloadMasterSnapshot(userId) {
+export async function downloadMasterSnapshot(userId, accountId = 'default') {
   if (!userId) return null;
   await ensureR2Config();
-  const key = `users/${userId}/journal_snapshot.json`;
+  const key = `users/${userId}/${accountId}/journal_snapshot.json`;
 
   try {
     const client = getR2Client();
@@ -95,6 +95,23 @@ export async function downloadMasterSnapshot(userId) {
     console.log(`[Cloudflare R2] Downloaded master snapshot: ${key}`);
     return JSON.parse(str);
   } catch (err) {
+    // If default account and not found, check legacy un-scoped key
+    if (!accountId || accountId === 'default') {
+      try {
+        const legacyKey = `users/${userId}/journal_snapshot.json`;
+        const client = getR2Client();
+        const command = new GetObjectCommand({
+          Bucket: R2_BUCKET,
+          Key: legacyKey
+        });
+        const response = await client.send(command);
+        const str = await response.Body.transformToString();
+        console.log(`[Cloudflare R2] Downloaded legacy master snapshot: ${legacyKey}`);
+        return JSON.parse(str);
+      } catch (legacyErr) {
+        // Neither key found
+      }
+    }
     console.warn('R2 download master snapshot note:', err.message);
     return null;
   }
@@ -103,10 +120,10 @@ export async function downloadMasterSnapshot(userId) {
 /**
  * Upload raw broker log (.txt) to Cloudflare R2
  */
-export async function uploadRawLogToCloud(userId, sessionDate, rawLogContent) {
+export async function uploadRawLogToCloud(userId, accountId = 'default', sessionDate, rawLogContent) {
   if (!userId || !sessionDate || !rawLogContent) return null;
   await ensureR2Config();
-  const key = `users/${userId}/logs/${sessionDate}.txt`;
+  const key = `users/${userId}/${accountId}/logs/${sessionDate}.txt`;
 
   try {
     const client = getR2Client();
@@ -129,10 +146,10 @@ export async function uploadRawLogToCloud(userId, sessionDate, rawLogContent) {
 /**
  * Download raw broker log (.txt) from Cloudflare R2
  */
-export async function downloadRawLogFromCloud(userId, sessionDate) {
+export async function downloadRawLogFromCloud(userId, accountId = 'default', sessionDate) {
   if (!userId || !sessionDate) return null;
   await ensureR2Config();
-  const key = `users/${userId}/logs/${sessionDate}.txt`;
+  const key = `users/${userId}/${accountId}/logs/${sessionDate}.txt`;
 
   try {
     const client = getR2Client();
@@ -145,6 +162,20 @@ export async function downloadRawLogFromCloud(userId, sessionDate) {
     console.log(`[Cloudflare R2] Downloaded raw log: ${key}`);
     return await response.Body.transformToString();
   } catch (err) {
+    // If default account and not found, check legacy un-scoped key
+    if (!accountId || accountId === 'default') {
+      try {
+        const legacyKey = `users/${userId}/logs/${sessionDate}.txt`;
+        const client = getR2Client();
+        const command = new GetObjectCommand({
+          Bucket: R2_BUCKET,
+          Key: legacyKey
+        });
+        const response = await client.send(command);
+        console.log(`[Cloudflare R2] Downloaded legacy raw log: ${legacyKey}`);
+        return await response.Body.transformToString();
+      } catch (legacyErr) {}
+    }
     console.warn('R2 download raw log note:', err.message);
     return null;
   }
@@ -153,10 +184,10 @@ export async function downloadRawLogFromCloud(userId, sessionDate) {
 /**
  * Delete raw log file (.txt) from Cloudflare R2
  */
-export async function deleteRawLogFromCloud(userId, sessionDate) {
+export async function deleteRawLogFromCloud(userId, accountId = 'default', sessionDate) {
   if (!userId || !sessionDate) return false;
   await ensureR2Config();
-  const key = `users/${userId}/logs/${sessionDate}.txt`;
+  const key = `users/${userId}/${accountId}/logs/${sessionDate}.txt`;
 
   try {
     const client = getR2Client();
@@ -166,6 +197,17 @@ export async function deleteRawLogFromCloud(userId, sessionDate) {
     });
     await client.send(command);
     console.log(`[Cloudflare R2] Deleted raw log: ${key}`);
+
+    if (!accountId || accountId === 'default') {
+      try {
+        const legacyKey = `users/${userId}/logs/${sessionDate}.txt`;
+        await client.send(new DeleteObjectCommand({
+          Bucket: R2_BUCKET,
+          Key: legacyKey
+        }));
+      } catch (e) {}
+    }
+
     return true;
   } catch (err) {
     console.warn('R2 delete raw log note:', err.message);
@@ -176,11 +218,11 @@ export async function deleteRawLogFromCloud(userId, sessionDate) {
 /**
  * Upload compressed screenshot (.jpg) to Cloudflare R2
  */
-export async function uploadScreenshotToCloud(userId, sessionDate, filename, dataUrl) {
+export async function uploadScreenshotToCloud(userId, accountId = 'default', sessionDate, filename, dataUrl) {
   if (!userId || !sessionDate || !dataUrl) return null;
   await ensureR2Config();
   const cleanFilename = filename.endsWith('.jpg') || filename.endsWith('.png') ? filename : `${filename}.jpg`;
-  const key = `users/${userId}/screenshots/${sessionDate}/${cleanFilename}`;
+  const key = `users/${userId}/${accountId}/screenshots/${sessionDate}/${cleanFilename}`;
 
   try {
     const client = getR2Client();

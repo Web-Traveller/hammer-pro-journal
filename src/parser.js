@@ -393,12 +393,12 @@ export function matchTradesFIFOWithOpenPos(executions) {
                     const first = pos.inventory[0];
                     const matchQty = Math.min(remainingQty, first.qty);
 
-                    // Integer-cents quantization to eliminate IEEE 754 floating-point drift
+                    // High-precision decimal safety to prevent IEEE 754 drift
                     let tradePnl = 0;
                     if (pos.side === 'B') {
-                        tradePnl = Math.round(((exec.execPrice * 100) - (first.price * 100)) * matchQty) / 100;
+                        tradePnl = Number(((exec.execPrice - first.price) * matchQty).toFixed(2));
                     } else {
-                        tradePnl = Math.round(((first.price * 100) - (exec.execPrice * 100)) * matchQty) / 100;
+                        tradePnl = Number(((first.price - exec.execPrice) * matchQty).toFixed(2));
                     }
 
                     const entryTime = first.time;
@@ -821,6 +821,59 @@ export function compileSingleDayAnalytics(executions, feePerRoundTripShare = 0.0
     const bestTrades = sortedByPnl.slice(0, topN);
     const worstTrades = sortedByPnl.filter(t => t.pnl < 0).slice(-topN).reverse();
 
+    // Session Phase Breakdown: Premarket (04:00-09:30), Regular (09:30-16:00), Postmarket (16:00-20:00)
+    const sessionPhases = {
+        premarket: { phase: 'Premarket', pnl: 0, grossPnl: 0, tradesCount: 0, wins: 0, volume: 0, winRate: 0 },
+        regular: { phase: 'Regular Hours', pnl: 0, grossPnl: 0, tradesCount: 0, wins: 0, volume: 0, winRate: 0 },
+        postmarket: { phase: 'After-Hours', pnl: 0, grossPnl: 0, tradesCount: 0, wins: 0, volume: 0, winRate: 0 },
+        hasExtendedHours: false
+    };
+
+    trades.forEach(t => {
+        const tradeTime = t.exitTime || t.entryTime;
+        const d = tradeTime instanceof Date ? tradeTime : new Date(tradeTime);
+        let h = 9, m = 30;
+        try {
+            const parts = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'America/New_York',
+                hour: 'numeric',
+                minute: 'numeric',
+                hour12: false
+            }).formatToParts(d);
+            for (const p of parts) {
+                if (p.type === 'hour') h = parseInt(p.value, 10);
+                if (p.type === 'minute') m = parseInt(p.value, 10);
+            }
+        } catch (e) {
+            h = d.getHours();
+            m = d.getMinutes();
+        }
+
+        const fees = enableFees ? (t.qty * feePerRoundTripShare) : 0;
+        const net = t.pnl - fees;
+
+        let target = sessionPhases.regular;
+        if (h < 9 || (h === 9 && m < 30)) {
+            target = sessionPhases.premarket;
+        } else if (h >= 16) {
+            target = sessionPhases.postmarket;
+        }
+
+        target.pnl += net;
+        target.grossPnl += t.pnl;
+        target.tradesCount += 1;
+        if (t.pnl > 0) target.wins += 1;
+        target.volume += t.qty;
+    });
+
+    ['premarket', 'regular', 'postmarket'].forEach(k => {
+        if (sessionPhases[k].tradesCount > 0) {
+            sessionPhases[k].winRate = (sessionPhases[k].wins / sessionPhases[k].tradesCount) * 100;
+        }
+    });
+
+    sessionPhases.hasExtendedHours = sessionPhases.premarket.tradesCount > 0 || sessionPhases.postmarket.tradesCount > 0;
+
     return {
         pnl: grossPnl,
         grossPnl,
@@ -865,6 +918,8 @@ export function compileSingleDayAnalytics(executions, feePerRoundTripShare = 0.0
         dayLitVolume,
         stockTimeMatrix,
         timeOfDayAnalytics: stockTimeMatrix ? stockTimeMatrix.overallSlots : {},
+        sessionPhases,
+        matchedTrades: trades,
         consolidatedTrades,
         bestTrades,
         worstTrades
@@ -992,36 +1047,66 @@ export function compileStockTimeMatrix(executions, feePerShare = 0.05, enableFee
     if (!executions || executions.length === 0) return { matrix: [], goldenWindow: null, dangerWindow: null, tickerInsights: {} };
 
     const trades = matchTradesFIFO(executions);
-    const timeSlots = [
-        '09:30-10:00',
-        '10:00-10:30',
-        '10:30-11:00',
-        '11:00-12:00',
-        '12:00-13:00',
-        '13:00-14:00',
-        '14:00-15:00',
-        '15:00-16:00'
+    const isIst = timezone === 'INDIA_IST';
+
+    // Comprehensive slot definitions across Premarket, Regular Market Hours, and After-Hours
+    const slotDefinitions = [
+        // Premarket Slots (US EDT)
+        { key: '04:00-07:00', isExtended: true, phase: 'PRE', label: isIst ? '01:30 - 04:30 PM (IST) [PRE]' : '04:00 - 07:00 AM (EDT) [PRE]' },
+        { key: '07:00-08:00', isExtended: true, phase: 'PRE', label: isIst ? '04:30 - 05:30 PM (IST) [PRE]' : '07:00 - 08:00 AM (EDT) [PRE]' },
+        { key: '08:00-09:00', isExtended: true, phase: 'PRE', label: isIst ? '05:30 - 06:30 PM (IST) [PRE]' : '08:00 - 09:00 AM (EDT) [PRE]' },
+        { key: '09:00-09:30', isExtended: true, phase: 'PRE', label: isIst ? '06:30 - 07:00 PM (IST) [PRE]' : '09:00 - 09:30 AM (EDT) [PRE]' },
+
+        // Core Regular Market Hours (US EDT: 09:30 AM - 04:00 PM)
+        { key: '09:30-10:00', isExtended: false, phase: 'REG', label: isIst ? '07:00 - 07:30 PM (IST)' : '09:30 - 10:00 AM (EDT)' },
+        { key: '10:00-10:30', isExtended: false, phase: 'REG', label: isIst ? '07:30 - 08:00 PM (IST)' : '10:00 - 10:30 AM (EDT)' },
+        { key: '10:30-11:00', isExtended: false, phase: 'REG', label: isIst ? '08:00 - 08:30 PM (IST)' : '10:30 - 11:00 AM (EDT)' },
+        { key: '11:00-12:00', isExtended: false, phase: 'REG', label: isIst ? '08:30 - 09:30 PM (IST)' : '11:00 - 12:00 PM (EDT)' },
+        { key: '12:00-13:00', isExtended: false, phase: 'REG', label: isIst ? '09:30 - 10:30 PM (IST)' : '12:00 - 01:00 PM (EDT)' },
+        { key: '13:00-14:00', isExtended: false, phase: 'REG', label: isIst ? '10:30 - 11:30 PM (IST)' : '01:00 - 02:00 PM (EDT)' },
+        { key: '14:00-15:00', isExtended: false, phase: 'REG', label: isIst ? '11:30 - 12:30 AM (IST)' : '02:00 - 03:00 PM (EDT)' },
+        { key: '15:00-16:00', isExtended: false, phase: 'REG', label: isIst ? '12:30 - 01:30 AM (IST)' : '03:00 - 04:00 PM (EDT)' },
+
+        // Postmarket / After-Hours Slots (US EDT)
+        { key: '16:00-17:00', isExtended: true, phase: 'POST', label: isIst ? '01:30 - 02:30 AM (IST) [POST]' : '04:00 - 05:00 PM (EDT) [POST]' },
+        { key: '17:00-18:00', isExtended: true, phase: 'POST', label: isIst ? '02:30 - 03:30 AM (IST) [POST]' : '05:00 - 06:00 PM (EDT) [POST]' },
+        { key: '18:00-20:00', isExtended: true, phase: 'POST', label: isIst ? '03:30 - 05:30 AM (IST) [POST]' : '06:00 - 08:00 PM (EDT) [POST]' }
     ];
 
-    const isIst = timezone === 'INDIA_IST';
-    const slotLabels = {
-        '09:30-10:00': isIst ? '07:00 - 07:30 PM (IST)' : '09:30 - 10:00 AM (EDT)',
-        '10:00-10:30': isIst ? '07:30 - 08:00 PM (IST)' : '10:00 - 10:30 AM (EDT)',
-        '10:30-11:00': isIst ? '08:00 - 08:30 PM (IST)' : '10:30 - 11:00 AM (EDT)',
-        '11:00-12:00': isIst ? '08:30 - 09:30 PM (IST)' : '11:00 - 12:00 PM (EDT)',
-        '12:00-13:00': isIst ? '09:30 - 10:30 PM (IST)' : '12:00 - 01:00 PM (EDT)',
-        '13:00-14:00': isIst ? '10:30 - 11:30 PM (IST)' : '01:00 - 02:00 PM (EDT)',
-        '14:00-15:00': isIst ? '11:30 - 12:30 AM (IST)' : '02:00 - 03:00 PM (EDT)',
-        '15:00-16:00': isIst ? '12:30 - 01:30 AM (IST)' : '03:00 - 04:00 PM (EDT)'
-    };
+    const slotLabels = {};
+    const allSlotKeys = [];
+    slotDefinitions.forEach(def => {
+        slotLabels[def.key] = def.label;
+        allSlotKeys.push(def.key);
+    });
 
-    // Overall slot aggregates
+    // Helper to determine exact slotKey from hour and minute in US Eastern
+    function getSlotKey(h, m) {
+        if (h < 7) return '04:00-07:00';
+        if (h === 7) return '07:00-08:00';
+        if (h === 8) return '08:00-09:00';
+        if (h === 9 && m < 30) return '09:00-09:30';
+        if (h === 9 && m >= 30) return '09:30-10:00';
+        if (h === 10 && m < 30) return '10:00-10:30';
+        if (h === 10 && m >= 30) return '10:30-11:00';
+        if (h === 11) return '11:00-12:00';
+        if (h === 12) return '12:00-13:00';
+        if (h === 13) return '13:00-14:00';
+        if (h === 14) return '14:00-15:00';
+        if (h === 15) return '15:00-16:00';
+        if (h === 16) return '16:00-17:00';
+        if (h === 17) return '17:00-18:00';
+        return '18:00-20:00';
+    }
+
+    // Initialize all slots for overall aggregates
     const overallSlots = {};
-    timeSlots.forEach(s => {
+    allSlotKeys.forEach(s => {
         overallSlots[s] = { slotKey: s, slotLabel: slotLabels[s], pnl: 0, tradesCount: 0, wins: 0, volume: 0 };
     });
 
     const stockSlots = {};
+    const activeSlotKeysSet = new Set();
 
     trades.forEach(trade => {
         const timeVal = trade.exitTime || trade.entryTime;
@@ -1045,16 +1130,8 @@ export function compileStockTimeMatrix(executions, feePerShare = 0.05, enableFee
             m = d.getMinutes();
         }
 
-        let slotKey = '09:30-10:00';
-        if (h < 9 || (h === 9 && m < 30)) slotKey = '09:30-10:00';
-        else if (h === 9 && m >= 30) slotKey = '09:30-10:00';
-        else if (h === 10 && m < 30) slotKey = '10:00-10:30';
-        else if (h === 10 && m >= 30) slotKey = '10:30-11:00';
-        else if (h === 11) slotKey = '11:00-12:00';
-        else if (h === 12) slotKey = '12:00-13:00';
-        else if (h === 13) slotKey = '13:00-14:00';
-        else if (h === 14) slotKey = '14:00-15:00';
-        else if (h >= 15) slotKey = '15:00-16:00';
+        const slotKey = getSlotKey(h, m);
+        activeSlotKeysSet.add(slotKey);
 
         const fees = enableFees ? (trade.qty * feePerShare) : 0;
         const net = trade.pnl - fees;
@@ -1071,7 +1148,7 @@ export function compileStockTimeMatrix(executions, feePerShare = 0.05, enableFee
         const sym = trade.symbol;
         if (!stockSlots[sym]) {
             stockSlots[sym] = { symbol: sym, slots: {} };
-            timeSlots.forEach(s => {
+            allSlotKeys.forEach(s => {
                 stockSlots[sym].slots[s] = { slotKey: s, pnl: 0, tradesCount: 0, wins: 0, volume: 0 };
             });
         }
@@ -1081,7 +1158,13 @@ export function compileStockTimeMatrix(executions, feePerShare = 0.05, enableFee
         stockSlots[sym].slots[slotKey].volume += trade.qty;
     });
 
-    // Find golden window and danger window overall
+    // Dynamic visible timeSlots for the matrix:
+    // Core regular hours are always shown; premarket and after-hours slots are only included if active.
+    const timeSlots = slotDefinitions
+        .filter(def => !def.isExtended || activeSlotKeysSet.has(def.key))
+        .map(def => def.key);
+
+    // Find golden window and danger window overall (among slots with active trades)
     const overallArray = Object.values(overallSlots).filter(s => s.tradesCount > 0);
     const sortedByProfit = [...overallArray].sort((a, b) => b.pnl - a.pnl);
     const goldenWindow = sortedByProfit.length > 0 && sortedByProfit[0].pnl > 0 ? sortedByProfit[0] : null;
@@ -1386,7 +1469,8 @@ export function compileECNAnalytics(executions) {
 
 export function compileHourlyAnalytics(executions, feePerShare = 0.05, enableFees = true, timezone = 'US_EASTERN') {
     const res = compileStockTimeMatrix(executions, feePerShare, enableFees, timezone);
-    return Object.values(res.overallSlots || {}).map(item => {
+    const activeSlots = (res.timeSlots || []).map(slotKey => res.overallSlots?.[slotKey]).filter(Boolean);
+    return activeSlots.map(item => {
         const winRate = item.tradesCount > 0 ? (item.wins / item.tradesCount) * 100 : 0;
         return {
             slotKey: item.slotKey,

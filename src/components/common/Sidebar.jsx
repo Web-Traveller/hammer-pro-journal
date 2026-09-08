@@ -24,7 +24,7 @@ export function Sidebar({ currentView, setCurrentView, userProfile, onOpenAuthMo
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
         <div className="nav-section-title">MENU</div>
         <div className="nav-links">
           <div className={`nav-item ${currentView === 'singleSession' ? 'active' : ''}`} onClick={() => setCurrentView('singleSession')}>

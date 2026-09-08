@@ -64,7 +64,7 @@ export function getIntradayChartOptions(curve = []) {
             if (!items.length) return '';
             const raw = curve[items[0].dataIndex];
             if (!raw) return '';
-            if (raw.symbol === 'OPEN') return 'Session Open (9:30 AM)';
+            if (raw.symbol === 'OPEN') return raw.timeLabel ? `Session Start (${raw.timeLabel})` : 'Session Start';
             return `${raw.timeLabel} • ${raw.symbol}`;
           },
           label: (context) => {

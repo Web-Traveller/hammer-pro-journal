@@ -72,6 +72,7 @@ CREATE INDEX IF NOT EXISTS idx_licenses_key ON public.licenses (license_key);
 CREATE TABLE IF NOT EXISTS public.daily_session_stats (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id TEXT NOT NULL,
+    account_id TEXT DEFAULT 'default' NOT NULL,
     session_date TEXT NOT NULL,
     pnl NUMERIC DEFAULT 0,
     gross_pnl NUMERIC DEFAULT 0,
@@ -87,11 +88,21 @@ CREATE TABLE IF NOT EXISTS public.daily_session_stats (
     screenshots_keys JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
-    CONSTRAINT uq_user_session_date UNIQUE (user_id, session_date)
+    CONSTRAINT uq_user_account_session_date UNIQUE (user_id, account_id, session_date)
 );
 
+-- Safe migration for existing tables to add account_id and update constraint
+ALTER TABLE public.daily_session_stats ADD COLUMN IF NOT EXISTS account_id TEXT DEFAULT 'default' NOT NULL;
+ALTER TABLE public.daily_session_stats DROP CONSTRAINT IF EXISTS uq_user_session_date;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_user_account_session_date') THEN
+        ALTER TABLE public.daily_session_stats ADD CONSTRAINT uq_user_account_session_date UNIQUE (user_id, account_id, session_date);
+    END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_daily_stats_user ON public.daily_session_stats (user_id);
-CREATE INDEX IF NOT EXISTS idx_daily_stats_user_date ON public.daily_session_stats (user_id, session_date);
+CREATE INDEX IF NOT EXISTS idx_daily_stats_user_account_date ON public.daily_session_stats (user_id, account_id, session_date);
 
 -- ==============================================================================
 -- 4. APP CONFIG TABLE (Version Gate & Feature Toggles)
@@ -105,30 +116,52 @@ CREATE TABLE IF NOT EXISTS public.app_config (
 );
 
 -- ==============================================================================
--- 5. ROW LEVEL SECURITY (RLS) POLICIES
--- Enables clean client-side sync via Supabase Anon Key without permission blocks
+-- 5. HARDENED PRODUCTION ROW LEVEL SECURITY (RLS) POLICIES
+-- Zero-Cost Enterprise Security: Restricts access strictly to record owners
 -- ==============================================================================
 ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.licenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.daily_session_stats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.app_config ENABLE ROW LEVEL SECURITY;
 
+-- Clean up old permissive policies
 DROP POLICY IF EXISTS "Allow user_profiles access" ON public.user_profiles;
 DROP POLICY IF EXISTS "Allow licenses access" ON public.licenses;
 DROP POLICY IF EXISTS "Allow daily_session_stats access" ON public.daily_session_stats;
 DROP POLICY IF EXISTS "Allow app_config read access" ON public.app_config;
+DROP POLICY IF EXISTS "Users can only access their own profile" ON public.user_profiles;
+DROP POLICY IF EXISTS "Users can only access their own session stats" ON public.daily_session_stats;
+DROP POLICY IF EXISTS "Users can only access their own license" ON public.licenses;
 
-CREATE POLICY "Allow user_profiles access"
-    ON public.user_profiles FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- 1. Daily Session Stats: Strictly scoped to authenticated user ID
+CREATE POLICY "Users can only access their own session stats"
+    ON public.daily_session_stats
+    FOR ALL
+    TO authenticated
+    USING (auth.uid()::text = user_id)
+    WITH CHECK (auth.uid()::text = user_id);
 
-CREATE POLICY "Allow licenses access"
-    ON public.licenses FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- 2. User Profiles: Strictly scoped to authenticated user ID
+CREATE POLICY "Users can only access their own profile"
+    ON public.user_profiles
+    FOR ALL
+    TO authenticated
+    USING (auth.uid() = id)
+    WITH CHECK (auth.uid() = id);
 
-CREATE POLICY "Allow daily_session_stats access"
-    ON public.daily_session_stats FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- 3. Licenses: Authenticated users can view their own bound license
+CREATE POLICY "Users can only access their own license"
+    ON public.licenses
+    FOR SELECT
+    TO authenticated
+    USING (auth.uid() = user_id OR user_id IS NULL);
 
+-- 4. App Config: Read-only for app clients (for version and endpoint resolution)
 CREATE POLICY "Allow app_config read access"
-    ON public.app_config FOR SELECT TO anon, authenticated USING (true);
+    ON public.app_config
+    FOR SELECT
+    TO anon, authenticated
+    USING (true);
 
 -- ==============================================================================
 -- 6. CRYPTOGRAPHIC UNGUESSABLE ACTIVATION CODE GENERATOR FUNCTION

@@ -29,6 +29,20 @@ export function getMonthPlatformFee(monthStr, settings) {
   return defaultFee;
 }
 
+// Fast in-memory parse cache to deliver instant 0ms session switching
+const parseCache = new Map();
+
+function getLogContentFingerprint(str) {
+  if (!str) return '0_0';
+  let hash = 0;
+  const sampleLen = Math.min(str.length, 500);
+  for (let i = 0; i < sampleLen; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return `${str.length}_${hash}`;
+}
+
 export function useAnalyticsMemos({
   logs,
   sessionDate,
@@ -41,13 +55,22 @@ export function useAnalyticsMemos({
 }) {
   const topTradesCount = settings?.journalTopTradesCount !== undefined ? settings.journalTopTradesCount : 2;
 
-  // 1. Daily Stats Map
+  // 1. Daily Stats Map with Incremental Parse Cache
   const dailyStatsMap = useMemo(() => {
     const map = {};
     Object.keys(logs || {}).forEach(dateStr => {
       try {
+        const raw = logs[dateStr];
+        if (!raw) return;
+        const cacheKey = `${dateStr}_${getLogContentFingerprint(raw)}_${settings?.feePerShare}_${settings?.enableFees}_${settings?.dateFormat}_${timezone}_${topTradesCount}`;
+        
+        if (parseCache.has(cacheKey)) {
+          map[dateStr] = parseCache.get(cacheKey);
+          return;
+        }
+
         const analysis = parseLogFile(
-          logs[dateStr],
+          raw,
           settings?.feePerShare,
           settings?.enableFees,
           settings?.dateFormat,
@@ -55,6 +78,7 @@ export function useAnalyticsMemos({
           topTradesCount
         );
         if (analysis) {
+          parseCache.set(cacheKey, analysis);
           map[dateStr] = analysis;
         }
       } catch (e) {
@@ -64,9 +88,12 @@ export function useAnalyticsMemos({
     return map;
   }, [logs, settings?.feePerShare, settings?.enableFees, settings?.dateFormat, timezone, topTradesCount]);
 
-  // 2. Single Session Analytics
+  // 2. Single Session Analytics (0ms Instant Reuse from dailyStatsMap)
   const singleSessionAnalytics = useMemo(() => {
     if (!sessionDate || !logs || !logs[sessionDate]) return null;
+    if (dailyStatsMap && dailyStatsMap[sessionDate]) {
+      return dailyStatsMap[sessionDate];
+    }
     try {
       return parseLogFile(
         logs[sessionDate],
@@ -80,7 +107,7 @@ export function useAnalyticsMemos({
       console.error("Error computing single session analytics:", e);
       return null;
     }
-  }, [sessionDate, logs, settings?.feePerShare, settings?.enableFees, settings?.dateFormat, timezone, topTradesCount]);
+  }, [sessionDate, logs, dailyStatsMap, settings?.feePerShare, settings?.enableFees, settings?.dateFormat, timezone, topTradesCount]);
 
   // 3. Available Months
   const availableMonths = useMemo(() => {

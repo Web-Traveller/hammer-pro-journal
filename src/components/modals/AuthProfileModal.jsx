@@ -30,7 +30,8 @@ export function AuthProfileModal({
   dailyStatsMap = {},
   userProfile = null,
   onProfileUpdated,
-  onSignOut
+  onSignOut,
+  activeAccountId = 'default'
 }) {
   const [profile, setProfile] = useState(() => userProfile || getActiveUserProfile());
   const [activeTab, setActiveTab] = useState(() => {
@@ -259,17 +260,17 @@ export function AuthProfileModal({
     setSyncing(true);
     clearFeedback();
     try {
-      const res = await executeTwoTierSync(dailyStatsMap);
-      if (res.success) {
+      const res = await executeTwoTierSync(dailyStatsMap, { force: true }, activeAccountId);
+      if (res && res.success) {
         const refreshed = getActiveUserProfile();
         setProfile(refreshed);
         if (onProfileUpdated) onProfileUpdated(refreshed);
         if (onToast) onToast('Cloud sync complete! All data up to date.', 'success');
       } else {
-        setErrorMessage(res.error || 'Cloud sync failed.');
+        setErrorMessage(res?.error || 'Cloud sync encountered an issue. Please try again.');
       }
     } catch (err) {
-      setErrorMessage('Sync encountered an error.');
+      setErrorMessage(err?.message || 'Sync encountered an error.');
     } finally {
       setSyncing(false);
     }

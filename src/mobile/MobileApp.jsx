@@ -45,7 +45,7 @@ export function MobileApp({
   const activeAnalytics = singleSessionAnalytics || dailyStatsMap[activeSessionDate] || null;
 
   const handleSyncNow = async () => {
-    await executeTwoTierSync(dailyStatsMap);
+    await executeTwoTierSync(dailyStatsMap, { force: true }, activeAccountId);
   };
 
   return (

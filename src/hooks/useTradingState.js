@@ -122,9 +122,9 @@ export function useTradingState() {
   const handleAuthenticatedUser = useCallback((profile) => {
     setUserProfile(profile);
     if (profile && profile.canCloudSync === true) {
-      executeTwoTierSync({}, { force: true });
+      executeTwoTierSync({}, { force: true }, activeAccountId);
     }
-  }, []);
+  }, [activeAccountId]);
 
   // 7. Timezone State
   const [timezone, setTimezone] = useState(getTimezone());
@@ -239,7 +239,7 @@ export function useTradingState() {
         const profile = getActiveUserProfile();
         setUserProfile(profile);
         if (profile && profile.canCloudSync === true) {
-          executeTwoTierSync();
+          executeTwoTierSync({}, {}, activeAccountId);
         }
       } catch (err) {
         console.error("Initialization error:", err);
@@ -271,7 +271,7 @@ export function useTradingState() {
           // If upgraded to cloud sync, trigger immediate sync
           if (prev && !prev.canCloudSync && statusPayload.profile.canCloudSync) {
             setTimeout(() => {
-              executeTwoTierSync({}, { force: true });
+              executeTwoTierSync({}, { force: true }, activeAccountId);
             }, 150);
           }
           return statusPayload.profile;
@@ -303,7 +303,7 @@ export function useTradingState() {
       if (pendingSyncRef.current) {
         const p = getActiveUserProfile();
         if (p && p.canCloudSync === true) {
-          executeTwoTierSync(dailyStatsMap).then(res => {
+          executeTwoTierSync(dailyStatsMap, {}, activeAccountId).then(res => {
             if (res && res.success) {
               pendingSyncRef.current = false;
               setHasUnsyncedChanges(false);
@@ -331,12 +331,12 @@ export function useTradingState() {
       refreshUserProfile().then(refreshed => {
         const p = refreshed || getActiveUserProfile();
         if (p && p.canCloudSync === true) {
-          executeTwoTierSync();
+          executeTwoTierSync({}, {}, activeAccountId);
         }
       }).catch(() => {
         const p = getActiveUserProfile();
         if (p && p.canCloudSync === true) {
-          executeTwoTierSync();
+          executeTwoTierSync({}, {}, activeAccountId);
         }
       });
     };
@@ -370,10 +370,10 @@ export function useTradingState() {
     // Check and refresh user profile entitlements silently from Supabase on startup
     refreshUserProfile().then(refreshed => {
       if (refreshed && refreshed.canCloudSync) {
-        executeTwoTierSync({}, { force: true });
+        executeTwoTierSync({}, { force: true }, activeAccountId);
       }
     }).catch(() => {});
-  }, []);
+  }, [activeAccountId]);
 
   // Licensing & Access Checker
   const handleRecheckLicense = async () => {
@@ -407,13 +407,13 @@ export function useTradingState() {
         const note = await loadJournalFromStorage(sessionDate, activeAccountId);
         setJournalNotes(note || '');
 
-        const imgs = await loadScreenshotsFromStorage(sessionDate);
+        const imgs = await loadScreenshotsFromStorage(sessionDate, activeAccountId);
         screenshotHandlers.setSessionScreenshots(imgs || []);
 
         if (logs[sessionDate]) {
           setEditingSessionLog(logs[sessionDate]);
         } else {
-          const fetchedLog = await fetchOnDemandSessionLog(sessionDate);
+          const fetchedLog = await fetchOnDemandSessionLog(sessionDate, activeAccountId);
           if (fetchedLog) {
             setLogs(prev => ({ ...prev, [sessionDate]: fetchedLog }));
             setEditingSessionLog(fetchedLog);
@@ -602,19 +602,20 @@ export function useTradingState() {
 
   const handleExportBackup = useCallback(async () => {
     try {
-      const snapshot = await createFullBackupSnapshot();
+      const snapshot = await createFullBackupSnapshot(activeAccountId);
       const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `HammerPro_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+      const accountSuffix = activeAccountId && activeAccountId !== 'default' ? `_${activeAccountId}` : '';
+      link.download = `HammerPro_Backup${accountSuffix}_${new Date().toISOString().slice(0, 10)}.json`;
       link.click();
       URL.revokeObjectURL(url);
       showToast("Full backup archive downloaded!", "success");
     } catch (err) {
       showToast("Backup export failed.", "error");
     }
-  }, [showToast]);
+  }, [showToast, activeAccountId]);
 
   const handleImportBackup = useCallback(async (e) => {
     const file = e.target.files[0];

@@ -328,7 +328,7 @@ export function SingleSessionView({
             <div className="card">
               <div className="card-top">
                 <span className="card-title">Win Rate</span>
-                <button className="card-icon-btn"><Percent size={16} /></button>
+                <button className="card-icon-btn card-icon-win"><Percent size={16} /></button>
               </div>
               <div className="card-value">
                 {sessionWinRate}%
@@ -342,14 +342,14 @@ export function SingleSessionView({
             <div className="card">
               <div className="card-top">
                 <span className="card-title">Trades &amp; Fills</span>
-                <button className="card-icon-btn"><FileText size={16} /></button>
+                <button className="card-icon-btn card-icon-trades"><FileText size={16} /></button>
               </div>
               <div className="card-value">
                 {(singleSessionAnalytics.consolidatedTrades && singleSessionAnalytics.consolidatedTrades.length > 0)
                   ? singleSessionAnalytics.consolidatedTrades.length
                   : (singleSessionAnalytics.totalTrades || singleSessionAnalytics.totalOrders || 0)} Trades
               </div>
-              <span className="card-footer-tag" style={{ backgroundColor: '#f3f4f6', color: '#374151' }}>
+              <span className="card-footer-tag">
                 {singleSessionAnalytics.totalFills || singleSessionAnalytics.totalOrders || 0} Fills ({singleSessionAnalytics.roundTripShares || 0} Shs)
               </span>
             </div>
@@ -358,12 +358,12 @@ export function SingleSessionView({
             <div className="card">
               <div className="card-top">
                 <span className="card-title">Avg Hold Duration</span>
-                <button className="card-icon-btn"><Clock size={16} /></button>
+                <button className="card-icon-btn card-icon-clock"><Clock size={16} /></button>
               </div>
               <div className="card-value">
                 {formatHoldTime(singleSessionAnalytics.stockBreakdown?.length > 0 ? (singleSessionAnalytics.stockBreakdown.reduce((acc, s) => acc + (s.avgHoldTime || 0), 0) / (singleSessionAnalytics.stockBreakdown.length || 1)) : 0)}
               </div>
-              <span className="card-footer-tag" style={{ backgroundColor: '#f3f4f6', color: '#374151' }}>
+              <span className="card-footer-tag">
                 {singleSessionAnalytics.totalBoughtQty || 0} Shs Bought / {singleSessionAnalytics.totalSoldQty || 0} Sold
               </span>
             </div>
@@ -443,34 +443,80 @@ export function SingleSessionView({
             </div>
           </div>
 
-          {/* Attached Screenshots Section */}
-          <div className="card" style={{ marginBottom: '1.5rem' }}>
-            <div className="card-top">
-              <span className="card-title" style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 700 }}>
-                Session Attached Screenshots ({sessionScreenshots.length})
-              </span>
-              <label className="btn btn-secondary" style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem', cursor: 'pointer' }}>
-                <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={onAddScreenshots} />
-                <Plus size={14} /> Add Screenshot
-              </label>
-            </div>
-            {sessionScreenshots.length > 0 ? (
-              <div className="screenshot-grid">
-                {sessionScreenshots.map((img, idx) => (
-                  <div key={idx} className="screenshot-card" onClick={() => onOpenLightbox(img.dataUrl)}>
-                    <img src={img.dataUrl} alt={`Session Screenshot ${idx + 1}`} />
-                    <button className="delete-btn" onClick={(e) => { e.stopPropagation(); onDeleteScreenshot(img.filename); }}>
-                      <X size={12} />
-                    </button>
+          {/* Extended Hours Session Phase Edge Breakdown */}
+          {singleSessionAnalytics.sessionPhases?.hasExtendedHours && (
+            <div className="card" style={{ marginBottom: '1.25rem', borderLeft: '4px solid var(--hero-green)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Clock size={16} color="var(--hero-green)" />
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Session Phase Edge Breakdown (Extended Hours Detected)
+                  </span>
+                </div>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  Premarket (04:00 - 09:30 EDT) • Regular Hours (09:30 - 16:00 EDT) • After-Hours (16:00 - 20:00 EDT)
+                </span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
+                {/* Premarket */}
+                <div className="phase-pill-card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0284c7', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#0284c7', display: 'inline-block' }}></span>
+                      PREMARKET
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      {singleSessionAnalytics.sessionPhases.premarket.tradesCount} trades
+                    </span>
                   </div>
-                ))}
+                  <div style={{ fontSize: '1.15rem', fontWeight: 800, color: (singleSessionAnalytics.sessionPhases.premarket.pnl || 0) >= 0 ? 'var(--hero-green)' : 'var(--rose-text)' }}>
+                    {(singleSessionAnalytics.sessionPhases.premarket.pnl || 0) >= 0 ? '+' : ''}${singleSessionAnalytics.sessionPhases.premarket.pnl.toFixed(2)}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                    {(singleSessionAnalytics.sessionPhases.premarket.winRate || 0).toFixed(0)}% Win • {singleSessionAnalytics.sessionPhases.premarket.volume.toLocaleString()} shs
+                  </div>
+                </div>
+
+                {/* Regular Market */}
+                <div className="phase-pill-card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#059669', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#059669', display: 'inline-block' }}></span>
+                      REGULAR HOURS (RTH)
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      {singleSessionAnalytics.sessionPhases.regular.tradesCount} trades
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '1.15rem', fontWeight: 800, color: (singleSessionAnalytics.sessionPhases.regular.pnl || 0) >= 0 ? 'var(--hero-green)' : 'var(--rose-text)' }}>
+                    {(singleSessionAnalytics.sessionPhases.regular.pnl || 0) >= 0 ? '+' : ''}${singleSessionAnalytics.sessionPhases.regular.pnl.toFixed(2)}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                    {(singleSessionAnalytics.sessionPhases.regular.winRate || 0).toFixed(0)}% Win • {singleSessionAnalytics.sessionPhases.regular.volume.toLocaleString()} shs
+                  </div>
+                </div>
+
+                {/* Postmarket */}
+                <div className="phase-pill-card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#7c3aed', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#7c3aed', display: 'inline-block' }}></span>
+                      AFTER-HOURS (POST)
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      {singleSessionAnalytics.sessionPhases.postmarket.tradesCount} trades
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '1.15rem', fontWeight: 800, color: (singleSessionAnalytics.sessionPhases.postmarket.pnl || 0) >= 0 ? 'var(--hero-green)' : 'var(--rose-text)' }}>
+                    {(singleSessionAnalytics.sessionPhases.postmarket.pnl || 0) >= 0 ? '+' : ''}${singleSessionAnalytics.sessionPhases.postmarket.pnl.toFixed(2)}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                    {(singleSessionAnalytics.sessionPhases.postmarket.winRate || 0).toFixed(0)}% Win • {singleSessionAnalytics.sessionPhases.postmarket.volume.toLocaleString()} shs
+                  </div>
+                </div>
               </div>
-            ) : (
-              <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '0.5rem 0' }}>
-                No closing screenshots attached for this session yet. Click "+ Add Screenshot" to upload.
-              </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Sub-tab Navigation Bar */}
           <div className="tab-bar">
@@ -484,25 +530,19 @@ export function SingleSessionView({
               className={`tab-btn ${sessionTab === 'timeMatrix' ? 'active' : ''}`}
               onClick={() => setSessionTab('timeMatrix')}
             >
-              <Clock size={15} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Stock × Time Matrix (Heatmap)
+              <Clock size={15} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Stock × Time Matrix
             </button>
             <button 
-              className={`tab-btn ${sessionTab === 'scalper' ? 'active' : ''}`}
+              className={`tab-btn ${(sessionTab === 'scalper' || sessionTab === 'ecn') ? 'active' : ''}`}
               onClick={() => setSessionTab('scalper')}
             >
-              <Zap size={15} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Tape Scalper &amp; Speed Breakdown
+              <Zap size={15} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Hold Speed &amp; Route Venues
             </button>
             <button 
               className={`tab-btn ${sessionTab === 'journal' ? 'active' : ''}`}
               onClick={() => setSessionTab('journal')}
             >
-              <BookOpen size={15} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Session Journal
-            </button>
-            <button 
-              className={`tab-btn ${sessionTab === 'ecn' ? 'active' : ''}`}
-              onClick={() => setSessionTab('ecn')}
-            >
-              <Layers size={15} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> ECN &amp; Route Breakdown
+              <BookOpen size={15} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Session Journal {sessionScreenshots && sessionScreenshots.length > 0 ? `(${sessionScreenshots.length})` : ''}
             </button>
             <button 
               className={`tab-btn ${sessionTab === 'raw' ? 'active' : ''}`}
@@ -707,11 +747,22 @@ export function SingleSessionView({
                       <thead>
                         <tr>
                           <th>Stock Ticker</th>
-                          {(singleSessionAnalytics.stockTimeMatrix.timeSlots || []).map(slotKey => (
-                            <th key={slotKey}>
-                              {singleSessionAnalytics.stockTimeMatrix.slotLabels?.[slotKey] || slotKey}
-                            </th>
-                          ))}
+                          {(singleSessionAnalytics.stockTimeMatrix.timeSlots || []).map(slotKey => {
+                            const isPre = slotKey < '09:30-10:00';
+                            const isPost = slotKey >= '16:00-17:00';
+                            return (
+                              <th 
+                                key={slotKey}
+                                style={
+                                  isPre ? { backgroundColor: '#f0f9ff', color: '#0369a1', borderBottom: '2px solid #38bdf8' }
+                                  : isPost ? { backgroundColor: '#faf5ff', color: '#6b21a8', borderBottom: '2px solid #c084fc' }
+                                  : {}
+                                }
+                              >
+                                {singleSessionAnalytics.stockTimeMatrix.slotLabels?.[slotKey] || slotKey}
+                              </th>
+                            );
+                          })}
                           <th>Day Total</th>
                         </tr>
                       </thead>
@@ -749,8 +800,8 @@ export function SingleSessionView({
             )
           )}
 
-          {/* TAB 3: TAPE SCALPER & SPEED BREAKDOWN */}
-          {sessionTab === 'scalper' && (
+          {/* TAB 3: TAPE SCALPER HOLD SPEED & ROUTE VENUES */}
+          {(sessionTab === 'scalper' || sessionTab === 'ecn') && (
             <div>
               {/* Hold Speed Metrics Grid */}
               <div className="card" style={{ marginBottom: '1.25rem' }}>
@@ -791,10 +842,56 @@ export function SingleSessionView({
                   {scalperScatterData && <Scatter data={scalperScatterData} options={scalperScatterOptions} />}
                 </div>
               </div>
+
+              {/* Consolidated ECN Route & Darkpool Execution Fills */}
+              <div className="card" style={{ marginTop: '1.25rem' }}>
+                <div className="card-top">
+                  <span className="card-title" style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 700 }}>
+                    Session ECN Route &amp; Darkpool Execution Fills ({sessionDate})
+                  </span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    Aggregated volume and fill count by execution venue &amp; liquidity pool
+                  </span>
+                </div>
+                <div className="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Route Venue</th>
+                        <th>Type</th>
+                        <th>Executed Volume</th>
+                        <th>Fills Count</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(singleSessionAnalytics.ecnBreakdown || []).length > 0 ? (
+                        (singleSessionAnalytics.ecnBreakdown || []).map((r) => (
+                          <tr key={r.route}>
+                            <td style={{ fontWeight: 800 }}>{r.route}</td>
+                            <td>
+                              <span className={`badge ${r.isDarkpool ? 'badge-darkpool' : 'badge-route'}`}>
+                                {r.isDarkpool ? 'Darkpool' : 'ECN'}
+                              </span>
+                            </td>
+                            <td style={{ fontWeight: 700 }}>{r.volume?.toLocaleString()} shares</td>
+                            <td>{r.fills} fills</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
+                            No specific ECN route execution fills recorded for this session.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           )}
 
-          {/* TAB 4: SESSION JOURNAL */}
+          {/* TAB 4: SESSION JOURNAL & ATTACHED SCREENSHOTS */}
           {sessionTab === 'journal' && (
             <div>
               <div className="journal-highlight-grid">
@@ -849,55 +946,39 @@ export function SingleSessionView({
                   </button>
                 </div>
               </div>
-            </div>
-          )}
 
-          {/* TAB 5: ECN & ROUTE BREAKDOWN */}
-          {sessionTab === 'ecn' && (
-            <div className="card">
-              <div className="card-top">
-                <span className="card-title" style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 700 }}>
-                  Session ECN Route &amp; Darkpool Execution Fills ({sessionDate})
-                </span>
-              </div>
-              <div className="table-container">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Route Venue</th>
-                      <th>Type</th>
-                      <th>Executed Volume</th>
-                      <th>Fills Count</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(singleSessionAnalytics.ecnBreakdown || []).length > 0 ? (
-                      (singleSessionAnalytics.ecnBreakdown || []).map((r) => (
-                        <tr key={r.route}>
-                          <td style={{ fontWeight: 800 }}>{r.route}</td>
-                          <td>
-                            <span className={`badge ${r.isDarkpool ? 'badge-darkpool' : 'badge-route'}`}>
-                              {r.isDarkpool ? 'Darkpool' : 'ECN'}
-                            </span>
-                          </td>
-                          <td style={{ fontWeight: 700 }}>{r.volume} shares</td>
-                          <td>{r.fills} fills</td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
-                          No specific ECN route execution fills recorded for this session.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+              {/* Session Attached Screenshots Section */}
+              <div className="card" style={{ marginTop: '1.25rem' }}>
+                <div className="card-top">
+                  <span className="card-title" style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 700 }}>
+                    Session Attached Screenshots ({sessionScreenshots ? sessionScreenshots.length : 0})
+                  </span>
+                  <label className="btn btn-secondary" style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem', cursor: 'pointer' }}>
+                    <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={onAddScreenshots} />
+                    <Plus size={14} /> Add Screenshot
+                  </label>
+                </div>
+                {sessionScreenshots && sessionScreenshots.length > 0 ? (
+                  <div className="screenshot-grid">
+                    {sessionScreenshots.map((img, idx) => (
+                      <div key={idx} className="screenshot-card" onClick={() => onOpenLightbox(img.dataUrl)}>
+                        <img src={img.dataUrl} alt={`Session Screenshot ${idx + 1}`} />
+                        <button className="delete-btn" onClick={(e) => { e.stopPropagation(); onDeleteScreenshot(img.filename); }}>
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '0.5rem 0' }}>
+                    No closing screenshots attached for this session yet. Click "+ Add Screenshot" to upload chart or Level 2 tape captures.
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* TAB 6: RAW LOG EDITOR */}
+          {/* TAB 5: RAW LOG EDITOR */}
           {sessionTab === 'raw' && (
             <div className="card">
               <div className="card-top" style={{ marginBottom: '0.75rem' }}>

@@ -48,8 +48,9 @@ export function LicenseGateModal({ isOpen = false, licenseCheck, userProfile, on
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.85)',
-        backdropFilter: 'blur(10px)',
+        backgroundColor: 'rgba(15, 23, 42, 0.45)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
         zIndex: 99998,
         display: 'flex',
         alignItems: 'center',

@@ -135,6 +135,7 @@ export default function App() {
           userProfile={state.userProfile}
           onProfileUpdated={state.handleAuthenticatedUser}
           onSignOut={() => state.handleAuthenticatedUser(null)}
+          activeAccountId={state.activeAccountId}
         />
 
         {/* Mobile Accounts Modal */}
@@ -170,7 +171,10 @@ export default function App() {
   }
 
   return (
-    <div className="app-container">
+    <div
+      className="app-container"
+      style={(!state.userProfile || !state.userProfile.id) ? { pointerEvents: 'none', userSelect: 'none' } : undefined}
+    >
       {/* Floating Toast Notification Container */}
       {state.toastMessage && (
         <div className="toast-container">
@@ -385,6 +389,7 @@ export default function App() {
           userProfile={state.userProfile}
           onProfileUpdated={state.handleAuthenticatedUser}
           onSignOut={() => state.handleAuthenticatedUser(null)}
+          activeAccountId={state.activeAccountId}
         />
 
         {/* TRADING ACCOUNTS MODAL */}

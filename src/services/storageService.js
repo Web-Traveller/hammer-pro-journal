@@ -9,8 +9,8 @@ import {
   idbLoadScreenshots,
   idbDeleteScreenshot,
   idbDeleteSessionScreenshots
-} from './indexedDbService';
-import { APP_VERSION } from '../version';
+} from './indexedDbService.js';
+import { APP_VERSION } from '../version.js';
 
 export function isTauriEnvironment() {
   return typeof window !== 'undefined' && (window.__TAURI_INTERNALS__ !== undefined || window.__TAURI__ !== undefined);
@@ -418,8 +418,8 @@ export async function saveSettingsToStorage(settings) {
 /**
  * Generate full backup snapshot
  */
-export async function createFullBackupSnapshot() {
-  const allLogs = await retrieveAllLogs();
+export async function createFullBackupSnapshot(accountId = 'default') {
+  const allLogs = await retrieveAllLogs(accountId);
   const journals = {};
   const screenshots = {};
   const settings = JSON.parse(localStorage.getItem("trading_settings") || "{}");
@@ -427,22 +427,24 @@ export async function createFullBackupSnapshot() {
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
     if (!key) continue;
-    if (key.startsWith("trading_journal_")) {
+    const expectedPrefix = (!accountId || accountId === 'default') ? 'trading_journal_' : `trading_journal_${accountId}_`;
+    if (key.startsWith(expectedPrefix)) {
       journals[key] = localStorage.getItem(key);
     }
   }
 
-  // Collect screenshots from IndexedDB and Tauri
+  // Collect screenshots from IndexedDB and Tauri for the specified account
   const dates = Object.keys(allLogs);
   for (const d of dates) {
-    const imgs = await loadScreenshotsFromStorage(d);
-    if (imgs.length > 0) {
+    const imgs = await loadScreenshotsFromStorage(d, accountId);
+    if (imgs && imgs.length > 0) {
       screenshots[d] = imgs;
     }
   }
 
   return {
     version: APP_VERSION,
+    accountId,
     exportedAt: new Date().toISOString(),
     logs: allLogs,
     journals,

@@ -7,7 +7,7 @@
  * 4. 100% Offline Local Mode
  */
 
-import { supabase } from './supabaseClient';
+import { supabase } from './supabaseClient.js';
 import {
   retrieveAllLogs,
   persistLog,
@@ -18,7 +18,7 @@ import {
   loadSettingsFromStorage,
   getDeletedSessionsTombstones,
   markSessionAsDeleted
-} from './storageService';
+} from './storageService.js';
 import {
   uploadMasterSnapshot,
   downloadMasterSnapshot,
@@ -27,10 +27,10 @@ import {
   deleteRawLogFromCloud,
   uploadScreenshotToCloud,
   downloadScreenshotFromCloud
-} from './r2StorageService';
-import { parseLogFile } from '../parser';
-import { computeContentHash } from '../utils/checksum';
-import { APP_VERSION } from '../version';
+} from './r2StorageService.js';
+import { parseLogFile } from '../parser.js';
+import { computeContentHash } from '../utils/checksum.js';
+import { APP_VERSION } from '../version.js';
 
 const AUTH_STORAGE_KEY = 'hammer_user_profile';
 
@@ -327,15 +327,15 @@ export async function refreshUserProfile() {
 /**
  * Fetch a single session's raw log on-demand (Lazy Loading)
  */
-export async function fetchOnDemandSessionLog(sessionDate) {
+export async function fetchOnDemandSessionLog(sessionDate, accountId = 'default') {
   if (!sessionDate) return null;
   const profile = getActiveUserProfile();
   if (!profile) return null;
 
   try {
-    const rawLog = await downloadRawLogFromCloud(profile.id, sessionDate);
+    const rawLog = await downloadRawLogFromCloud(profile.id, accountId, sessionDate);
     if (rawLog) {
-      await persistLog(sessionDate, rawLog);
+      await persistLog(sessionDate, rawLog, accountId);
       return rawLog;
     }
   } catch (err) {
@@ -346,7 +346,27 @@ export async function fetchOnDemandSessionLog(sessionDate) {
 
 // Mutex lock and throttling for sync execution
 let isSyncRunning = false;
+let activeSyncPromise = null;
 let lastSyncExecutionTime = 0;
+
+let hasAccountIdChecked = false;
+let hasAccountIdInStats = false;
+
+/**
+ * Dynamically check if Supabase daily_session_stats has the account_id column
+ * This prevents PostgREST 42703 / PGRST204 errors when remote DB hasn't been migrated yet.
+ */
+export async function checkHasAccountIdColumn() {
+  if (hasAccountIdChecked) return hasAccountIdInStats;
+  try {
+    const { error } = await supabase.from('daily_session_stats').select('account_id').limit(0);
+    hasAccountIdInStats = !error;
+  } catch (e) {
+    hasAccountIdInStats = false;
+  }
+  hasAccountIdChecked = true;
+  return hasAccountIdInStats;
+}
 
 /**
  * Two-Way Full Sync (Cloudflare R2 + Supabase)
@@ -355,7 +375,7 @@ let lastSyncExecutionTime = 0;
  * 2. PULL: Reads Master Snapshot from R2 & Supabase, downloads missing session logs to local disk,
  *          and returns all merged sessions so Device 2 immediately shows all past trade history!
  */
-export async function executeTwoTierSync(dailyStatsMap = {}, options = {}) {
+export async function executeTwoTierSync(dailyStatsMap = {}, options = {}, accountId = 'default') {
   const profile = getActiveUserProfile();
   if (!profile) {
     notifySyncStatus('local_only', 'Local offline mode active.');
@@ -368,10 +388,14 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}) {
     return { success: false, mode: 'local', error: 'Cloud Sync is disabled for your account. Contact the administrator to enable cloud sync.' };
   }
 
-  // Mutex Lock: Prevent concurrent syncs
-  if (isSyncRunning) {
-    console.log('[Sync] Synchronization already in progress. Skipping duplicate call.');
-    return { success: false, inProgress: true };
+  // Mutex Lock: If sync is already running, await in-flight sync instead of failing immediately!
+  if (isSyncRunning && activeSyncPromise) {
+    console.log('[Sync] Synchronization already in progress. Awaiting in-flight sync...');
+    try {
+      return await activeSyncPromise;
+    } catch (e) {
+      return { success: false, error: e?.message || 'In-flight sync encountered an issue.' };
+    }
   }
 
   // Rate Limiting: Minimum 4 seconds cooldown between background sync runs unless explicitly forced
@@ -383,243 +407,269 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}) {
   isSyncRunning = true;
   lastSyncExecutionTime = now;
 
-  try {
-    const settings = (await loadSettingsFromStorage()) || {};
-    const provider = profile.cloudProvider || settings.cloudProvider || 'supabase_cloud';
+  const runSync = async () => {
+    try {
+      const settings = (await loadSettingsFromStorage()) || {};
+      const provider = profile.cloudProvider || settings.cloudProvider || 'supabase_cloud';
 
-    if (provider === 'supabase_cloud') {
-      const diskLogs = await retrieveAllLogs();
-      const allLocalLogs = { ...diskLogs, ...(options.explicitLogs || {}) };
-      const localDates = Object.keys(allLocalLogs).sort();
+      if (provider === 'supabase_cloud') {
+        const diskLogs = await retrieveAllLogs(accountId);
+        const allLocalLogs = { ...diskLogs, ...(options.explicitLogs || {}) };
+        const localDates = Object.keys(allLocalLogs).sort();
 
-      // Compute cryptographic SHA-256 hash of current local state
-      const localFingerprint = await computeContentHash(JSON.stringify(allLocalLogs));
+        // Compute cryptographic SHA-256 hash of current local state
+        const localFingerprint = await computeContentHash(JSON.stringify(allLocalLogs));
 
-      // Fetch remote snapshot fingerprint from Supabase (lightweight metadata check)
-      let remoteHash = null;
-      try {
-        const { data: dbProfile, error: dbErr } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('id', profile.id)
-          .maybeSingle();
-        if (!dbErr && dbProfile && dbProfile.snapshot_hash) {
-          remoteHash = dbProfile.snapshot_hash;
+        // Fetch remote snapshot fingerprint from Supabase (lightweight metadata check)
+        let remoteHash = null;
+        try {
+          const { data: dbProfile, error: dbErr } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('id', profile.id)
+            .maybeSingle();
+          if (!dbErr && dbProfile && dbProfile.snapshot_hash) {
+            remoteHash = dbProfile.snapshot_hash;
+          }
+        } catch (e) {
+          // Fallback gracefully without error
         }
-      } catch (e) {
-        // Fallback gracefully without error
-      }
 
-      // FAST PATH: If remote hash matches local fingerprint and we have logs, skip all R2 requests!
-      if (!options.explicitLogs && remoteHash && remoteHash === localFingerprint && localDates.length > 0) {
+        // FAST PATH: If remote hash matches local fingerprint and we have logs, skip all R2 requests!
+        if (!options.explicitLogs && remoteHash && remoteHash === localFingerprint && localDates.length > 0) {
+          profile.lastSyncTimestamp = Date.now();
+          saveActiveUserProfile(profile, false);
+          notifySyncStatus('synced', 'All sessions synced across devices!', {
+            profile,
+            syncedLogs: allLocalLogs,
+            hasNewLogs: false
+          });
+          return { success: true, mode: 'cloud', syncedLogs: allLocalLogs, hasNewLogs: false, skippedR2: true };
+        }
+
+        notifySyncStatus('syncing', 'Syncing trading data with Cloudflare R2...');
+
+        // ==========================================
+        // STEP 1: PULL FIRST (Cloudflare R2 + Supabase -> Device Local Disk)
+        // Merges any remote sessions uploaded from other devices (e.g. Office PC -> Laptop)
+        // ==========================================
+        let syncedNewLogs = false;
+        const tombstones = getDeletedSessionsTombstones();
+        const updatedLocalLogs = { ...allLocalLogs };
+        
+        // Clean any tombstoned session from local logs
+        for (const delDate of Object.keys(tombstones)) {
+          delete updatedLocalLogs[delDate];
+        }
+
+        // A. Pull Master Snapshot from Cloudflare R2
+        try {
+          const cloudSnapshot = await downloadMasterSnapshot(profile.id, accountId);
+          if (cloudSnapshot && cloudSnapshot.sessions) {
+            for (const sDate of Object.keys(cloudSnapshot.sessions)) {
+              if (tombstones[sDate]) continue; // Never re-pull deleted session
+
+              const item = cloudSnapshot.sessions[sDate];
+              if (item && item.journalNote) {
+                await saveJournalToStorage(sDate, item.journalNote, accountId);
+              }
+
+              // Download missing log file from cloud
+              if (!updatedLocalLogs[sDate]) {
+                const rawLogFromR2 = await downloadRawLogFromCloud(profile.id, accountId, sDate);
+                if (rawLogFromR2) {
+                  await persistLog(sDate, rawLogFromR2, accountId);
+                  updatedLocalLogs[sDate] = rawLogFromR2;
+                  syncedNewLogs = true;
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[Cloud Sync] Master snapshot pull note:', e);
+        }
+
+        // B. Query Supabase daily_session_stats for any missing session metadata
+        try {
+          const hasAccountCol = await checkHasAccountIdColumn();
+          let statsQuery = supabase
+            .from('daily_session_stats')
+            .select('*')
+            .eq('user_id', profile.id);
+
+          if (hasAccountCol) {
+            statsQuery = statsQuery.eq('account_id', accountId);
+          }
+
+          const { data: dbSessions, error: dbStatsErr } = await statsQuery;
+
+          if (dbStatsErr) {
+            console.warn('[Cloud Sync] Supabase stats query note:', dbStatsErr.message);
+          } else if (Array.isArray(dbSessions)) {
+            for (const session of dbSessions) {
+              const sDate = session.session_date;
+              if (sDate && !tombstones[sDate] && !updatedLocalLogs[sDate]) {
+                const rawLog = await downloadRawLogFromCloud(profile.id, accountId, sDate);
+                if (rawLog) {
+                  await persistLog(sDate, rawLog, accountId);
+                  updatedLocalLogs[sDate] = rawLog;
+                  syncedNewLogs = true;
+                }
+              }
+              if (sDate && !tombstones[sDate] && session.journal_note) {
+                await saveJournalToStorage(sDate, session.journal_note, accountId);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[Cloud Sync] Supabase stats query exception:', e);
+        }
+
+        // ==========================================
+        // STEP 2: PUSH (Merged Local Disk -> Cloudflare R2 + Supabase)
+        // Pushes complete union of all trade history back to cloud
+        // ==========================================
+        const combinedDates = Object.keys(updatedLocalLogs).sort();
+        const masterSessionsSummary = {};
+        const rowsToUpsert = [];
+        const hasAccountCol = await checkHasAccountIdColumn();
+
+        for (const dateStr of combinedDates) {
+          const rawContent = updatedLocalLogs[dateStr] || '';
+          let stats = dailyStatsMap[dateStr];
+
+          if (!stats && rawContent) {
+            stats = parseLogFile(rawContent, settings.feePerShare, settings.enableFees, settings.dateFormat, 'US_EASTERN');
+          }
+          stats = stats || {};
+
+          const journal = await loadJournalFromStorage(dateStr, accountId);
+          const screenshots = await loadScreenshotsFromStorage(dateStr, accountId);
+
+          let r2LogKey = '';
+          if (rawContent) {
+            r2LogKey = await uploadRawLogToCloud(profile.id, accountId, dateStr, rawContent);
+          }
+
+          const screenshotKeys = [];
+          const maxImages = profile.dailyImageLimit ?? 0;
+          if (maxImages > 0 && screenshots && screenshots.length > 0) {
+            const imgsToUpload = screenshots.slice(0, maxImages);
+            for (const img of imgsToUpload) {
+              if (img.dataUrl) {
+                const key = await uploadScreenshotToCloud(profile.id, accountId, dateStr, img.filename, img.dataUrl);
+                if (key) screenshotKeys.push({ filename: img.filename, key });
+              }
+            }
+          }
+
+          const summaryItem = {
+            pnl: stats.pnl || 0,
+            grossPnl: stats.grossPnl || stats.pnl || 0,
+            netPnl: stats.netPnl || stats.pnl || 0,
+            fees: stats.fees || 0,
+            winRate: stats.winRate || 0,
+            totalOrders: stats.totalOrders || 0,
+            roundTripShares: stats.roundTripShares || 0,
+            avgHoldTime: stats.avgHoldTime || 0,
+            profitFactor: stats.profitFactor || 0,
+            stockBreakdown: stats.stockBreakdown || [],
+            journalNote: journal || '',
+            r2LogKey: r2LogKey || '',
+            screenshotsKeys: screenshotKeys
+          };
+
+          masterSessionsSummary[dateStr] = summaryItem;
+
+          const row = {
+            user_id: profile.id,
+            session_date: dateStr,
+            pnl: summaryItem.pnl,
+            gross_pnl: summaryItem.grossPnl,
+            net_pnl: summaryItem.netPnl,
+            fees: summaryItem.fees,
+            win_rate: summaryItem.winRate,
+            total_trades: summaryItem.totalOrders,
+            round_trip_shares: summaryItem.roundTripShares,
+            avg_hold_seconds: summaryItem.avgHoldTime,
+            profit_factor: summaryItem.profitFactor,
+            journal_note: journal || '',
+            r2_log_key: r2LogKey || '',
+            screenshots_keys: screenshotKeys,
+            updated_at: new Date().toISOString()
+          };
+
+          if (hasAccountCol) {
+            row.account_id = accountId;
+          }
+
+          rowsToUpsert.push(row);
+        }
+
+        // 1. Upload Master Snapshot JSON to Cloudflare R2
+        if (combinedDates.length > 0) {
+          const masterSnapshotPayload = {
+            version: APP_VERSION,
+            userId: profile.id,
+            accountId: accountId,
+            updatedAt: new Date().toISOString(),
+            sessions: masterSessionsSummary
+          };
+          await uploadMasterSnapshot(profile.id, accountId, masterSnapshotPayload);
+        }
+
+        // 2. Upsert metadata rows to Supabase daily_session_stats
+        if (rowsToUpsert.length > 0) {
+          const conflictTarget = hasAccountCol ? 'user_id,account_id,session_date' : 'user_id,session_date';
+          const { error: pushErr } = await supabase
+            .from('daily_session_stats')
+            .upsert(rowsToUpsert, { onConflict: conflictTarget });
+
+          if (pushErr) {
+            console.warn('Supabase metadata upsert note:', pushErr.message);
+          }
+        }
+
+        // Update snapshot fingerprint in Supabase user_profiles
+        const finalFingerprint = await computeContentHash(JSON.stringify(updatedLocalLogs));
+        try {
+          await supabase
+            .from('user_profiles')
+            .update({ snapshot_hash: finalFingerprint, updated_at: new Date().toISOString() })
+            .eq('id', profile.id);
+        } catch (e) {}
+
         profile.lastSyncTimestamp = Date.now();
         saveActiveUserProfile(profile, false);
         notifySyncStatus('synced', 'All sessions synced across devices!', {
           profile,
-          syncedLogs: allLocalLogs,
-          hasNewLogs: false
+          syncedLogs: updatedLocalLogs,
+          hasNewLogs: syncedNewLogs
         });
-        return { success: true, mode: 'cloud', syncedLogs: allLocalLogs, hasNewLogs: false, skippedR2: true };
-      }
 
-      notifySyncStatus('syncing', 'Syncing trading data with Cloudflare R2...');
-
-      // ==========================================
-      // STEP 1: PULL FIRST (Cloudflare R2 + Supabase -> Device Local Disk)
-      // Merges any remote sessions uploaded from other devices (e.g. Office PC -> Laptop)
-      // ==========================================
-      let syncedNewLogs = false;
-      const tombstones = getDeletedSessionsTombstones();
-      const updatedLocalLogs = { ...allLocalLogs };
-      
-      // Clean any tombstoned session from local logs
-      for (const delDate of Object.keys(tombstones)) {
-        delete updatedLocalLogs[delDate];
-      }
-
-      // A. Pull Master Snapshot from Cloudflare R2
-      try {
-        const cloudSnapshot = await downloadMasterSnapshot(profile.id);
-        if (cloudSnapshot && cloudSnapshot.sessions) {
-          for (const sDate of Object.keys(cloudSnapshot.sessions)) {
-            if (tombstones[sDate]) continue; // Never re-pull deleted session
-
-            const item = cloudSnapshot.sessions[sDate];
-            if (item && item.journalNote) {
-              await saveJournalToStorage(sDate, item.journalNote);
-            }
-
-            // Download missing log file from cloud
-            if (!updatedLocalLogs[sDate]) {
-              const rawLogFromR2 = await downloadRawLogFromCloud(profile.id, sDate);
-              if (rawLogFromR2) {
-                await persistLog(sDate, rawLogFromR2);
-                updatedLocalLogs[sDate] = rawLogFromR2;
-                syncedNewLogs = true;
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('[Cloud Sync] Master snapshot pull note:', e);
-      }
-
-      // B. Query Supabase daily_session_stats for any missing session metadata
-      try {
-        const { data: dbSessions } = await supabase
-          .from('daily_session_stats')
-          .select('*')
-          .eq('user_id', profile.id);
-
-        if (Array.isArray(dbSessions)) {
-          for (const session of dbSessions) {
-            const sDate = session.session_date;
-            if (sDate && !tombstones[sDate] && !updatedLocalLogs[sDate]) {
-              const rawLog = await downloadRawLogFromCloud(profile.id, sDate);
-              if (rawLog) {
-                await persistLog(sDate, rawLog);
-                updatedLocalLogs[sDate] = rawLog;
-                syncedNewLogs = true;
-              }
-            }
-            if (sDate && !tombstones[sDate] && session.journal_note) {
-              await saveJournalToStorage(sDate, session.journal_note);
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('[Cloud Sync] Supabase stats query note:', e);
-      }
-
-      // ==========================================
-      // STEP 2: PUSH (Merged Local Disk -> Cloudflare R2 + Supabase)
-      // Pushes complete union of all trade history back to cloud
-      // ==========================================
-      const combinedDates = Object.keys(updatedLocalLogs).sort();
-      const masterSessionsSummary = {};
-      const rowsToUpsert = [];
-
-      for (const dateStr of combinedDates) {
-        const rawContent = updatedLocalLogs[dateStr] || '';
-        let stats = dailyStatsMap[dateStr];
-
-        if (!stats && rawContent) {
-          stats = parseLogFile(rawContent, settings.feePerShare, settings.enableFees, settings.dateFormat, 'US_EASTERN');
-        }
-        stats = stats || {};
-
-        const journal = await loadJournalFromStorage(dateStr);
-        const screenshots = await loadScreenshotsFromStorage(dateStr);
-
-        let r2LogKey = '';
-        if (rawContent) {
-          r2LogKey = await uploadRawLogToCloud(profile.id, dateStr, rawContent);
-        }
-
-        const screenshotKeys = [];
-        const maxImages = profile.dailyImageLimit ?? 0;
-        if (maxImages > 0 && screenshots && screenshots.length > 0) {
-          const imgsToUpload = screenshots.slice(0, maxImages);
-          for (const img of imgsToUpload) {
-            if (img.dataUrl) {
-              const key = await uploadScreenshotToCloud(profile.id, dateStr, img.filename, img.dataUrl);
-              if (key) screenshotKeys.push({ filename: img.filename, key });
-            }
-          }
-        }
-
-        const summaryItem = {
-          pnl: stats.pnl || 0,
-          grossPnl: stats.grossPnl || stats.pnl || 0,
-          netPnl: stats.netPnl || stats.pnl || 0,
-          fees: stats.fees || 0,
-          winRate: stats.winRate || 0,
-          totalOrders: stats.totalOrders || 0,
-          roundTripShares: stats.roundTripShares || 0,
-          avgHoldTime: stats.avgHoldTime || 0,
-          profitFactor: stats.profitFactor || 0,
-          stockBreakdown: stats.stockBreakdown || [],
-          journalNote: journal || '',
-          r2LogKey: r2LogKey || '',
-          screenshotsKeys: screenshotKeys
+        return {
+          success: true,
+          mode: 'cloud',
+          syncedLogs: updatedLocalLogs,
+          hasNewLogs: syncedNewLogs
         };
-
-        masterSessionsSummary[dateStr] = summaryItem;
-
-        rowsToUpsert.push({
-          user_id: profile.id,
-          session_date: dateStr,
-          pnl: summaryItem.pnl,
-          gross_pnl: summaryItem.grossPnl,
-          net_pnl: summaryItem.netPnl,
-          fees: summaryItem.fees,
-          win_rate: summaryItem.winRate,
-          total_trades: summaryItem.totalOrders,
-          round_trip_shares: summaryItem.roundTripShares,
-          avg_hold_seconds: summaryItem.avgHoldTime,
-          profit_factor: summaryItem.profitFactor,
-          journal_note: journal || '',
-          r2_log_key: r2LogKey || '',
-          screenshots_keys: screenshotKeys,
-          updated_at: new Date().toISOString()
-        });
       }
 
-      // 1. Upload Master Snapshot JSON to Cloudflare R2
-      if (combinedDates.length > 0) {
-        const masterSnapshotPayload = {
-          version: APP_VERSION,
-          userId: profile.id,
-          updatedAt: new Date().toISOString(),
-          sessions: masterSessionsSummary
-        };
-        await uploadMasterSnapshot(profile.id, masterSnapshotPayload);
-      }
+      return { success: true, mode: 'local' };
 
-      // 2. Upsert metadata rows to Supabase daily_session_stats
-      if (rowsToUpsert.length > 0) {
-        const { error: pushErr } = await supabase
-          .from('daily_session_stats')
-          .upsert(rowsToUpsert, { onConflict: 'user_id,session_date' });
-
-        if (pushErr) {
-          console.warn('Supabase metadata upsert note:', pushErr.message);
-        }
-      }
-
-      // Update snapshot fingerprint in Supabase user_profiles
-      const finalFingerprint = await computeContentHash(JSON.stringify(updatedLocalLogs));
-      try {
-        await supabase
-          .from('user_profiles')
-          .update({ snapshot_hash: finalFingerprint, updated_at: new Date().toISOString() })
-          .eq('id', profile.id);
-      } catch (e) {}
-
-      profile.lastSyncTimestamp = Date.now();
-      saveActiveUserProfile(profile, false);
-      notifySyncStatus('synced', 'All sessions synced across devices!', {
-        profile,
-        syncedLogs: updatedLocalLogs,
-        hasNewLogs: syncedNewLogs
-      });
-
-      return {
-        success: true,
-        mode: 'cloud',
-        syncedLogs: updatedLocalLogs,
-        hasNewLogs: syncedNewLogs
-      };
+    } catch (err) {
+      console.error('Two-tier sync error:', err);
+      notifySyncStatus('error', err.message || 'Sync encountered an error.');
+      return { success: false, error: err.message || 'Sync encountered an unexpected error.' };
     }
+  };
 
-    return { success: true, mode: 'local' };
-
-  } catch (err) {
-    console.error('Two-tier sync error:', err);
-    notifySyncStatus('error', err.message || 'Sync encountered an error.');
-    return { success: false, error: err.message };
+  activeSyncPromise = runSync();
+  try {
+    return await activeSyncPromise;
   } finally {
     isSyncRunning = false;
+    activeSyncPromise = null;
   }
 }
 
@@ -627,28 +677,34 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}) {
  * Permanently deletes a session date from both Cloudflare R2 and Supabase
  * Prevents deleted sessions from re-syncing from the cloud!
  */
-export async function deleteSessionFromCloud(sessionDate) {
+export async function deleteSessionFromCloud(sessionDate, accountId = 'default') {
   const profile = getActiveUserProfile();
   if (!sessionDate) return;
 
   // Immediately record tombstone
-  markSessionAsDeleted(sessionDate);
+  markSessionAsDeleted(sessionDate, null, accountId);
 
   if (!profile) return;
 
   try {
     // 1. Delete raw log from Cloudflare R2
-    await deleteRawLogFromCloud(profile.id, sessionDate);
+    await deleteRawLogFromCloud(profile.id, accountId, sessionDate);
 
     // 2. Delete metadata row from Supabase daily_session_stats
-    await supabase
+    const hasAccountCol = await checkHasAccountIdColumn();
+    let deleteQuery = supabase
       .from('daily_session_stats')
       .delete()
       .eq('user_id', profile.id)
       .eq('session_date', sessionDate);
 
+    if (hasAccountCol) {
+      deleteQuery = deleteQuery.eq('account_id', accountId);
+    }
+    await deleteQuery;
+
     // 3. Rebuild and upload updated Master Snapshot to Cloudflare R2 without deleted session
-    const diskLogs = await retrieveAllLogs();
+    const diskLogs = await retrieveAllLogs(accountId);
     const remainingDates = Object.keys(diskLogs).filter(d => d !== sessionDate);
     const settings = (await loadSettingsFromStorage()) || {};
 
@@ -676,10 +732,11 @@ export async function deleteSessionFromCloud(sessionDate) {
     const updatedSnapshot = {
       version: APP_VERSION,
       userId: profile.id,
+      accountId: accountId,
       updatedAt: new Date().toISOString(),
       sessions: updatedSessionsSummary
     };
-    await uploadMasterSnapshot(profile.id, updatedSnapshot);
+    await uploadMasterSnapshot(profile.id, accountId, updatedSnapshot);
 
     // 4. Update SHA-256 fingerprint in Supabase
     const updatedFingerprint = await computeContentHash(JSON.stringify(diskLogs));
