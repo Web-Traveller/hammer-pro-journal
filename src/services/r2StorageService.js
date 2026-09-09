@@ -5,9 +5,14 @@
  * 1. Master Journal Snapshot (uploadMasterSnapshot / downloadMasterSnapshot)
  * 2. Raw Log Streaming (uploadRawLogToCloud / downloadRawLogFromCloud)
  * 3. Screenshot Images (uploadScreenshotToCloud / downloadScreenshotFromCloud)
+ * 
+ * CRITICAL DIRECTIVE ENFORCEMENT:
+ * - Strictly account-scoped paths: users/${userId}/${accountId}/...
+ * - Zero root-level writes (users/${userId}/...)
+ * - Zero hard S3 DELETE operations (DeleteObjectCommand removed)
  */
 
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { fetchAppConfig } from './supabaseClient.js';
 
 export let R2_ACCOUNT_ID = '76cdb43cd04ce3235b092defe0eeaeac';
@@ -50,11 +55,13 @@ function getR2Client() {
 
 /**
  * Upload Master Journal Snapshot to Cloudflare R2
+ * Strictly scoped under: users/{userId}/{accountId}/journal_snapshot.json
  */
 export async function uploadMasterSnapshot(userId, accountId = 'default', snapshotData) {
   if (!userId || !snapshotData) return null;
   await ensureR2Config();
-  const key = `users/${userId}/${accountId}/journal_snapshot.json`;
+  const safeAccountId = accountId || 'default';
+  const key = `users/${userId}/${safeAccountId}/journal_snapshot.json`;
 
   try {
     const client = getR2Client();
@@ -81,7 +88,8 @@ export async function uploadMasterSnapshot(userId, accountId = 'default', snapsh
 export async function downloadMasterSnapshot(userId, accountId = 'default') {
   if (!userId) return null;
   await ensureR2Config();
-  const key = `users/${userId}/${accountId}/journal_snapshot.json`;
+  const safeAccountId = accountId || 'default';
+  const key = `users/${userId}/${safeAccountId}/journal_snapshot.json`;
 
   try {
     const client = getR2Client();
@@ -95,7 +103,7 @@ export async function downloadMasterSnapshot(userId, accountId = 'default') {
     console.log(`[Cloudflare R2] Downloaded master snapshot: ${key}`);
     return JSON.parse(str);
   } catch (err) {
-    // If default account and not found, check legacy un-scoped key
+    // Read-only legacy fallback for default account if new structure not yet populated
     if (!accountId || accountId === 'default') {
       try {
         const legacyKey = `users/${userId}/journal_snapshot.json`;
@@ -106,7 +114,7 @@ export async function downloadMasterSnapshot(userId, accountId = 'default') {
         });
         const response = await client.send(command);
         const str = await response.Body.transformToString();
-        console.log(`[Cloudflare R2] Downloaded legacy master snapshot: ${legacyKey}`);
+        console.log(`[Cloudflare R2] Downloaded legacy master snapshot (read-only): ${legacyKey}`);
         return JSON.parse(str);
       } catch (legacyErr) {
         // Neither key found
@@ -119,11 +127,13 @@ export async function downloadMasterSnapshot(userId, accountId = 'default') {
 
 /**
  * Upload raw broker log (.txt) to Cloudflare R2
+ * Strictly scoped under: users/{userId}/{accountId}/logs/{sessionDate}.txt
  */
 export async function uploadRawLogToCloud(userId, accountId = 'default', sessionDate, rawLogContent) {
   if (!userId || !sessionDate || !rawLogContent) return null;
   await ensureR2Config();
-  const key = `users/${userId}/${accountId}/logs/${sessionDate}.txt`;
+  const safeAccountId = accountId || 'default';
+  const key = `users/${userId}/${safeAccountId}/logs/${sessionDate}.txt`;
 
   try {
     const client = getR2Client();
@@ -149,7 +159,8 @@ export async function uploadRawLogToCloud(userId, accountId = 'default', session
 export async function downloadRawLogFromCloud(userId, accountId = 'default', sessionDate) {
   if (!userId || !sessionDate) return null;
   await ensureR2Config();
-  const key = `users/${userId}/${accountId}/logs/${sessionDate}.txt`;
+  const safeAccountId = accountId || 'default';
+  const key = `users/${userId}/${safeAccountId}/logs/${sessionDate}.txt`;
 
   try {
     const client = getR2Client();
@@ -162,7 +173,7 @@ export async function downloadRawLogFromCloud(userId, accountId = 'default', ses
     console.log(`[Cloudflare R2] Downloaded raw log: ${key}`);
     return await response.Body.transformToString();
   } catch (err) {
-    // If default account and not found, check legacy un-scoped key
+    // Read-only legacy fallback for default account
     if (!accountId || accountId === 'default') {
       try {
         const legacyKey = `users/${userId}/logs/${sessionDate}.txt`;
@@ -172,7 +183,7 @@ export async function downloadRawLogFromCloud(userId, accountId = 'default', ses
           Key: legacyKey
         });
         const response = await client.send(command);
-        console.log(`[Cloudflare R2] Downloaded legacy raw log: ${legacyKey}`);
+        console.log(`[Cloudflare R2] Downloaded legacy raw log (read-only): ${legacyKey}`);
         return await response.Body.transformToString();
       } catch (legacyErr) {}
     }
@@ -182,47 +193,25 @@ export async function downloadRawLogFromCloud(userId, accountId = 'default', ses
 }
 
 /**
- * Delete raw log file (.txt) from Cloudflare R2
+ * Safe Cloud Delete Handler (Soft Deletion / Non-Destructive)
+ * In accordance with critical safety directives, automated hard deletions via DeleteObjectCommand
+ * are disabled. Deleted sessions are excluded from Master Snapshot and masked via tombstones.
  */
 export async function deleteRawLogFromCloud(userId, accountId = 'default', sessionDate) {
-  if (!userId || !sessionDate) return false;
-  await ensureR2Config();
-  const key = `users/${userId}/${accountId}/logs/${sessionDate}.txt`;
-
-  try {
-    const client = getR2Client();
-    const command = new DeleteObjectCommand({
-      Bucket: R2_BUCKET,
-      Key: key
-    });
-    await client.send(command);
-    console.log(`[Cloudflare R2] Deleted raw log: ${key}`);
-
-    if (!accountId || accountId === 'default') {
-      try {
-        const legacyKey = `users/${userId}/logs/${sessionDate}.txt`;
-        await client.send(new DeleteObjectCommand({
-          Bucket: R2_BUCKET,
-          Key: legacyKey
-        }));
-      } catch (e) {}
-    }
-
-    return true;
-  } catch (err) {
-    console.warn('R2 delete raw log note:', err.message);
-    return false;
-  }
+  console.log(`[Cloudflare R2] Soft-delete registered for ${sessionDate} in account ${accountId}. Hard S3 deletes are disabled for safety.`);
+  return true;
 }
 
 /**
  * Upload compressed screenshot (.jpg) to Cloudflare R2
+ * Strictly scoped under: users/{userId}/{accountId}/screenshots/{sessionDate}/{cleanFilename}
  */
 export async function uploadScreenshotToCloud(userId, accountId = 'default', sessionDate, filename, dataUrl) {
   if (!userId || !sessionDate || !dataUrl) return null;
   await ensureR2Config();
+  const safeAccountId = accountId || 'default';
   const cleanFilename = filename.endsWith('.jpg') || filename.endsWith('.png') ? filename : `${filename}.jpg`;
-  const key = `users/${userId}/${accountId}/screenshots/${sessionDate}/${cleanFilename}`;
+  const key = `users/${userId}/${safeAccountId}/screenshots/${sessionDate}/${cleanFilename}`;
 
   try {
     const client = getR2Client();

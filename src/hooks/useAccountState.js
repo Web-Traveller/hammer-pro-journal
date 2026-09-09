@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { retrieveAccountsConfig, persistAccountsConfig } from '../services/storageService';
+import { syncUserAccounts, getActiveUserProfile } from '../services/authService';
 
 const ACCOUNTS_STORAGE_KEY = 'hammer_user_accounts';
 const ACTIVE_ACCOUNT_STORAGE_KEY = 'hammer_active_account_id';
@@ -22,17 +23,31 @@ export function useAccountState(showToast) {
     return DEFAULT_ACCOUNTS;
   });
 
-  // Load from disk if available
+  // Load from disk and sync with Supabase user_accounts if available
   useEffect(() => {
-    async function loadDiskAccounts() {
+    let isCurrent = true;
+    async function loadAndSyncAccounts() {
       try {
         const diskAccounts = await retrieveAccountsConfig();
+        if (!isCurrent) return;
         if (diskAccounts && Array.isArray(diskAccounts) && diskAccounts.length > 0) {
           setAccounts(diskAccounts);
         }
-      } catch (e) {}
+
+        const profile = getActiveUserProfile();
+        if (profile && profile.id) {
+          const synced = await syncUserAccounts(profile.id);
+          if (!isCurrent) return;
+          if (synced && Array.isArray(synced) && synced.length > 0) {
+            setAccounts(synced);
+          }
+        }
+      } catch (e) {
+        console.warn('Account sync initialization note:', e);
+      }
     }
-    loadDiskAccounts();
+    loadAndSyncAccounts();
+    return () => { isCurrent = false; };
   }, []);
 
   const [activeAccountId, setActiveAccountId] = useState(() => {
@@ -45,10 +60,14 @@ export function useAccountState(showToast) {
 
   const [showAccountsModal, setShowAccountsModal] = useState(false);
 
-  // Sync accounts to storage
+  // Sync accounts to storage and remote database
   const saveAccounts = useCallback((newAccounts) => {
     setAccounts(newAccounts);
     persistAccountsConfig(newAccounts);
+    const profile = getActiveUserProfile();
+    if (profile && profile.id) {
+      syncUserAccounts(profile.id).catch(e => console.warn('Background account sync note:', e));
+    }
   }, []);
 
   const handleSwitchAccount = useCallback((accountId) => {

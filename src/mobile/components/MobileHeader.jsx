@@ -1,5 +1,6 @@
 import React from 'react';
 import { RefreshCw, Zap, Clock, User } from 'lucide-react';
+import { getTimezoneBadge } from '../../services/timeService';
 
 export function MobileHeader({
   timezone,
@@ -71,7 +72,7 @@ export function MobileHeader({
           type="button"
         >
           <Clock size={13} />
-          <span>{timezone === 'US_EASTERN' ? 'EDT' : 'IST'}</span>
+          <span>{getTimezoneBadge(null, timezone)}</span>
         </button>
 
         {/* Avatar / Profile Button */}

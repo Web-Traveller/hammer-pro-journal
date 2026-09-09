@@ -102,7 +102,7 @@ export function useImportHandlers({
     const grossPnlVal = parseFloat(manualData.grossPnl || 0);
     const totalSharesVal = parseInt(manualData.totalShares || 0, 10);
     const roundTripSharesVal = parseInt(manualData.roundTripShares || totalSharesVal, 10);
-    const feeRate = settings?.enableFees ? (parseFloat(settings?.feePerShare) || 0.005) : 0;
+    const feeRate = settings?.enableFees ? (parseFloat(settings?.feePerShare) || 0.04) : 0;
     const dynamicFees = roundTripSharesVal * feeRate;
 
     const netPnlVal = (manualData.netPnl !== undefined && manualData.netPnl !== '' && !isNaN(parseFloat(manualData.netPnl)))
@@ -149,7 +149,7 @@ export function useImportHandlers({
     const totalOrders = parseInt(manualData.totalOrders || manualData.totalTrades || 1, 10);
     const tradesCount = parseInt(manualData.tradesCount || manualData.totalTrades || totalOrders, 10);
 
-    const feeRate = settings?.enableFees ? (parseFloat(settings?.feePerShare) || 0.005) : 0;
+    const feeRate = settings?.enableFees ? (parseFloat(settings?.feePerShare) || 0.04) : 0;
     const dynamicFees = roundTripShares * feeRate;
 
     let netPnl = grossPnl - dynamicFees;

@@ -83,7 +83,7 @@ export function useTradingState() {
     enableJournal: true,
     journalTopTradesCount: 2,
     enableFees: false,
-    feePerShare: 0.005,
+    feePerShare: 0.04,
     enableMonthlyPlatformFee: false,
     monthlyPlatformFee: 150,
     silentUpdates: true,
@@ -204,17 +204,27 @@ export function useTradingState() {
   // LIFECYCLE & SYNC EFFECTS
   // =========================================================================
 
-  // Initial Load from Storage & Account Switch Listener
+  // Initial Load from Storage & Account Switch Listener (with race condition protection)
   useEffect(() => {
+    let isCurrent = true;
+
+    // Step 4: Instantly clear local state to prevent PnL jumping
+    setLogs({});
+    setSessionDate('');
+    userLockedSessionDateRef.current = false;
+
     async function initData() {
       try {
-        cleanExpiredBackupRevisions(14);
+        cleanExpiredBackupRevisions(14, activeAccountId);
         const loadedSettings = await loadSettingsFromStorage();
+        if (!isCurrent) return;
         if (loadedSettings) {
           setSettings(prev => ({ ...prev, ...loadedSettings, enableJournal: true }));
         }
 
         const loadedLogs = await loadLogsFromStorage(activeAccountId);
+        if (!isCurrent) return;
+
         if (loadedLogs && Object.keys(loadedLogs).length > 0) {
           setLogs(loadedLogs);
           const sortedDates = Object.keys(loadedLogs).sort().reverse();
@@ -237,18 +247,29 @@ export function useTradingState() {
         }
 
         const profile = getActiveUserProfile();
+        if (!isCurrent) return;
         setUserProfile(profile);
+
         if (profile && profile.canCloudSync === true) {
-          executeTwoTierSync({}, {}, activeAccountId);
+          const syncRes = await executeTwoTierSync({}, {}, activeAccountId);
+          if (!isCurrent) return;
+          if (syncRes && syncRes.syncedLogs && Object.keys(syncRes.syncedLogs).length > 0) {
+            setLogs(syncRes.syncedLogs);
+          }
         }
       } catch (err) {
+        if (!isCurrent) return;
         console.error("Initialization error:", err);
       }
     }
     initData();
+
+    return () => {
+      isCurrent = false;
+    };
   }, [activeAccountId]);
 
-  // Listen to sync broadcasts without overriding user-picked dates
+  // Listen to sync broadcasts without overriding user-picked dates and isolated by account
   useEffect(() => {
     const unsubscribe = subscribeSyncStatus((statusPayload) => {
       setSyncState(statusPayload);
@@ -277,6 +298,12 @@ export function useTradingState() {
           return statusPayload.profile;
         });
       }
+
+      // Step 4: Ignore broadcast if it belongs to a different account
+      if (statusPayload.accountId && statusPayload.accountId !== activeAccountId) {
+        return;
+      }
+
       if (statusPayload.syncedLogs && Object.keys(statusPayload.syncedLogs).length > 0) {
         setLogs(prev => ({ ...prev, ...statusPayload.syncedLogs }));
         const sorted = Object.keys(statusPayload.syncedLogs).sort().reverse();
@@ -295,7 +322,7 @@ export function useTradingState() {
       }
     });
     return unsubscribe;
-  }, []);
+  }, [activeAccountId]);
 
   // Deferred Background Sync (Flushes every 5 min ONLY if actual changes occurred)
   useEffect(() => {
@@ -546,7 +573,7 @@ export function useTradingState() {
     setSessionDate(remaining[0] || '');
     setDeleteConfirmationDate(null);
     showToast(`Session ${date} deleted.`, "info");
-    await deleteSessionFromCloud(date);
+    await deleteSessionFromCloud(date, activeAccountId);
   }, [deleteConfirmationDate, logs, showToast, activeAccountId]);
 
   const handleExportCSV = useCallback(() => {

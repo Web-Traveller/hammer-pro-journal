@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Share2, X, Download, Copy, Check, Sun, Moon } from 'lucide-react';
-import { formatDisplayDate } from '../../services/timeService';
+import { formatDisplayDate, getTimezoneBadge } from '../../services/timeService';
 
 export function ShareCardModal({
   isOpen,
@@ -101,7 +101,7 @@ export function ShareCardModal({
 
     // Verified Session Pill (Top Right)
     const displayDate = formatDisplayDate(sessionDate) || sessionDate;
-    const tzBadge = timezone === 'INDIA_IST' ? 'IST' : 'EDT';
+    const tzBadge = getTimezoneBadge(sessionDate, timezone);
     const headerPillText = `SESSION: ${displayDate.toUpperCase()} • ${tzBadge}`;
     
     ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif';

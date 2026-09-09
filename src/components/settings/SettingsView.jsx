@@ -276,15 +276,15 @@ export function SettingsView({
               <label className="form-label" style={{ fontSize: '0.82rem', fontWeight: 600 }}>Fee Rate Per Round-Trip Share ($)</label>
               <input
                 type="number"
-                step="0.001"
+                step="0.01"
                 min="0"
                 className="form-input"
-                value={settings.feePerShare}
+                value={settings.feePerShare ?? 0.04}
                 onChange={(e) => onSaveSettings({ ...settings, feePerShare: parseFloat(e.target.value) || 0 })}
                 style={{ maxWidth: '240px' }}
               />
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.35rem' }}>
-                Example: $0.005 / share (1,000 round-trip shares = $5.00 execution fee)
+                Default: $0.04 / round-trip trade (1 entry + 1 exit of 1 share). Example: 1,000 round-trip shares = $40.00 fee.
               </span>
             </div>
           )}

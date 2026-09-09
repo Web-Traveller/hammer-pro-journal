@@ -1,5 +1,6 @@
 import React from 'react';
 import { Line } from 'react-chartjs-2';
+import { getTimezoneDisplayTitle } from '../../services/timeService';
 import {
   ChevronLeft,
   ChevronRight,
@@ -220,7 +221,7 @@ export function DashboardView({
             {dashboardMonthFilter === 'ALL' ? 'All-Time Accumulated Equity Curve' : `Accumulated Equity Growth (${dashboardMonthFilter})`}
           </span>
           <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Timezone: {timezone === 'INDIA_IST' ? '🇮🇳 Indian Standard Time (IST)' : '🇺🇸 US Eastern Market Time (EDT)'}
+            Timezone: {getTimezoneDisplayTitle(null, timezone)}
           </span>
         </div>
         <div className="chart-container">

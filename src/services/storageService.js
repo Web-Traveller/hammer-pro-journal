@@ -109,56 +109,98 @@ export async function cleanExpiredBackupRevisions(maxDays = 14, accountId = 'def
 
 const DELETED_SESSIONS_STORAGE_KEY = 'hammer_deleted_sessions_v1';
 
-export function getDeletedSessionsTombstones() {
+/**
+ * Loads all tombstones grouped by account: { [accountId]: { [dateStr]: { deletedAt, expiresAt } } }
+ * Automatically migrates legacy flat structures.
+ */
+export function getAllDeletedSessionsTombstones() {
   try {
     const raw = localStorage.getItem(DELETED_SESSIONS_STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
     const now = Date.now();
     const active = {};
-    for (const [date, info] of Object.entries(parsed)) {
-      if (info && info.expiresAt && info.expiresAt > now) {
-        active[date] = info;
+
+    // Check if legacy flat structure: { "2026-03-01": { expiresAt, ... } }
+    const firstKey = Object.keys(parsed)[0];
+    const isLegacyFlat = firstKey && parsed[firstKey] && typeof parsed[firstKey].expiresAt === 'number';
+
+    if (isLegacyFlat) {
+      active['default'] = {};
+      for (const [date, info] of Object.entries(parsed)) {
+        if (info && info.expiresAt && info.expiresAt > now) {
+          active['default'][date] = info;
+        }
+      }
+    } else {
+      for (const [accId, datesMap] of Object.entries(parsed)) {
+        if (datesMap && typeof datesMap === 'object') {
+          active[accId] = {};
+          for (const [date, info] of Object.entries(datesMap)) {
+            if (info && info.expiresAt && info.expiresAt > now) {
+              active[accId][date] = info;
+            }
+          }
+        }
       }
     }
-    if (Object.keys(active).length !== Object.keys(parsed).length) {
-      localStorage.setItem(DELETED_SESSIONS_STORAGE_KEY, JSON.stringify(active));
-    }
+
+    localStorage.setItem(DELETED_SESSIONS_STORAGE_KEY, JSON.stringify(active));
     return active;
   } catch (e) {
     return {};
   }
 }
 
+/**
+ * Get active tombstones strictly for a specific account: { [dateStr]: { deletedAt, expiresAt } }
+ */
+export function getDeletedSessionsTombstones(accountId = 'default') {
+  const safeAccountId = accountId || 'default';
+  const allTombstones = getAllDeletedSessionsTombstones();
+  return allTombstones[safeAccountId] || {};
+}
+
+/**
+ * Mark session as deleted under a specific account
+ */
 export function markSessionAsDeleted(date, previousContent = null, accountId = 'default') {
   if (!date) return;
   const cleanDate = date.trim();
+  const safeAccountId = accountId || 'default';
   const now = Date.now();
   const expiresAt = now + 14 * 24 * 60 * 60 * 1000; // 14 days retention
 
-  const tombstones = getDeletedSessionsTombstones();
-  tombstones[cleanDate] = {
+  const allTombstones = getAllDeletedSessionsTombstones();
+  if (!allTombstones[safeAccountId]) {
+    allTombstones[safeAccountId] = {};
+  }
+  allTombstones[safeAccountId][cleanDate] = {
     deletedAt: now,
     expiresAt
   };
 
   try {
-    localStorage.setItem(DELETED_SESSIONS_STORAGE_KEY, JSON.stringify(tombstones));
+    localStorage.setItem(DELETED_SESSIONS_STORAGE_KEY, JSON.stringify(allTombstones));
     if (previousContent) {
-      saveLogRevisionBackup(cleanDate, previousContent, accountId);
+      saveLogRevisionBackup(cleanDate, previousContent, safeAccountId);
     }
   } catch (e) {
     console.warn("Error marking session as deleted tombstone:", e);
   }
 }
 
-export function unmarkSessionAsDeleted(date) {
+/**
+ * Unmark session as deleted when re-imported or re-saved
+ */
+export function unmarkSessionAsDeleted(date, accountId = 'default') {
   if (!date) return;
   const cleanDate = date.trim();
-  const tombstones = getDeletedSessionsTombstones();
-  if (tombstones[cleanDate]) {
-    delete tombstones[cleanDate];
-    localStorage.setItem(DELETED_SESSIONS_STORAGE_KEY, JSON.stringify(tombstones));
+  const safeAccountId = accountId || 'default';
+  const allTombstones = getAllDeletedSessionsTombstones();
+  if (allTombstones[safeAccountId] && allTombstones[safeAccountId][cleanDate]) {
+    delete allTombstones[safeAccountId][cleanDate];
+    localStorage.setItem(DELETED_SESSIONS_STORAGE_KEY, JSON.stringify(allTombstones));
   }
 }
 
@@ -187,18 +229,19 @@ export async function persistLog(date, content, accountId = 'default') {
   }
 
   const cleanDate = date.trim();
-  const logKey = getAccountLogKey(cleanDate, accountId);
-  unmarkSessionAsDeleted(cleanDate);
+  const safeAccountId = accountId || 'default';
+  const logKey = getAccountLogKey(cleanDate, safeAccountId);
+  unmarkSessionAsDeleted(cleanDate, safeAccountId);
   
   // If an existing log exists and is being edited, save a revision backup first
   try {
     const existing = localStorage.getItem(logKey);
     if (existing && existing !== content) {
-      await saveLogRevisionBackup(cleanDate, existing, accountId);
+      await saveLogRevisionBackup(cleanDate, existing, safeAccountId);
     }
   } catch (e) {}
 
-  const tauriRes = await safeTauriInvoke("save_log", { date: cleanDate, content, accountId });
+  const tauriRes = await safeTauriInvoke("save_log", { date: cleanDate, content, accountId: safeAccountId });
   
   try {
     localStorage.setItem(logKey, content);
@@ -213,9 +256,10 @@ export async function persistLog(date, content, accountId = 'default') {
  */
 export async function retrieveAllLogs(accountId = 'default') {
   let logs = {};
+  const safeAccountId = accountId || 'default';
   if (isTauriEnvironment()) {
     try {
-      const result = await safeTauriInvoke("load_all_logs", { accountId });
+      const result = await safeTauriInvoke("load_all_logs", { accountId: safeAccountId });
       if (result && typeof result === 'object' && Object.keys(result).length > 0) {
         logs = result;
       }
@@ -226,8 +270,8 @@ export async function retrieveAllLogs(accountId = 'default') {
 
   // Fallback / merge with LocalStorage by matching account prefix
   try {
-    const isDefault = !accountId || accountId === 'default';
-    const prefix = isDefault ? 'trading_log_' : `trading_log_${accountId}_`;
+    const isDefault = !safeAccountId || safeAccountId === 'default';
+    const prefix = isDefault ? 'trading_log_' : `trading_log_${safeAccountId}_`;
 
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -255,8 +299,8 @@ export async function retrieveAllLogs(accountId = 'default') {
     console.error("LocalStorage read error:", e);
   }
 
-  // Enforce 14-day deleted tombstones
-  const tombstones = getDeletedSessionsTombstones();
+  // Enforce account-scoped 14-day deleted tombstones
+  const tombstones = getDeletedSessionsTombstones(safeAccountId);
   for (const deletedDate of Object.keys(tombstones)) {
     delete logs[deletedDate];
   }
@@ -270,13 +314,14 @@ export async function retrieveAllLogs(accountId = 'default') {
 export async function removeLog(date, accountId = 'default') {
   if (!date) return;
   const cleanDate = date.trim();
-  const logKey = getAccountLogKey(cleanDate, accountId);
-  const journalKey = getAccountJournalKey(cleanDate, accountId);
+  const safeAccountId = accountId || 'default';
+  const logKey = getAccountLogKey(cleanDate, safeAccountId);
+  const journalKey = getAccountJournalKey(cleanDate, safeAccountId);
 
   const previousContent = localStorage.getItem(logKey);
-  markSessionAsDeleted(cleanDate, previousContent);
+  markSessionAsDeleted(cleanDate, previousContent, safeAccountId);
 
-  await safeTauriInvoke("delete_log", { date: cleanDate, accountId });
+  await safeTauriInvoke("delete_log", { date: cleanDate, accountId: safeAccountId });
   await idbDeleteSessionScreenshots(cleanDate);
 
   try {
@@ -284,7 +329,7 @@ export async function removeLog(date, accountId = 'default') {
     localStorage.removeItem(journalKey);
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const key = localStorage.key(i);
-      if (key && (key.startsWith(`trading_img_${cleanDate}_`) || key.startsWith(`trading_img_${accountId}_${cleanDate}_`))) {
+      if (key && (key.startsWith(`trading_img_${cleanDate}_`) || key.startsWith(`trading_img_${safeAccountId}_${cleanDate}_`))) {
         localStorage.removeItem(key);
       }
     }

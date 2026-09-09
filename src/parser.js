@@ -1,5 +1,13 @@
 // JS parser, FIFO matching engine, Level 2 Scalper analytics, Intraday Stock x Time Matrix, and Defensive Date Engine
-import { formatInTimezone, getTimeBucket, createUSMarketDate } from './services/timeService.js';
+import {
+    formatInTimezone,
+    getTimeBucket,
+    createUSMarketDate,
+    formatSlotLabel,
+    getTimezoneBadge,
+    getSessionPhaseRanges,
+    getTimezoneDisplayTitle
+} from './services/timeService.js';
 
 export class Position {
     constructor(symbol, side) {
@@ -315,7 +323,7 @@ export function validateLogBatch(rawText, defaultDateStr = null, dateFormatSetti
     let previewTrades = 0;
     try {
         if (executions.length > 0) {
-            const preview = compileSingleDayAnalytics(executions, 0.005, false, 'US_EASTERN');
+            const preview = compileSingleDayAnalytics(executions, 0.04, false, 'US_EASTERN');
             if (preview) {
                 previewGrossPnl = preview.grossPnl !== undefined ? preview.grossPnl : (preview.pnl || 0);
                 previewShares = preview.roundTripShares || 0;
@@ -548,7 +556,7 @@ export function consolidateRoundTripTrades(matchedTrades) {
 /**
  * Level 2 Tape Scalper Deep-Dive Session Analytics
  */
-export function compileSingleDayAnalytics(executions, feePerRoundTripShare = 0.05, enableFees = true, timezone = 'US_EASTERN', journalTopTradesCount = 2) {
+export function compileSingleDayAnalytics(executions, feePerRoundTripShare = 0.04, enableFees = true, timezone = 'US_EASTERN', journalTopTradesCount = 2) {
     if (!executions || executions.length === 0) return null;
 
     const sortedExecs = [...executions].sort((a, b) => {
@@ -929,7 +937,7 @@ export function compileSingleDayAnalytics(executions, feePerRoundTripShare = 0.0
 /**
  * Main parser entry point - takes raw text and produces full day analytics
  */
-export function parseLogFile(rawText, feePerRoundTripShare = 0.05, enableFees = true, dateFormatSetting = 'DD-MM-YY', timezone = 'US_EASTERN', journalTopTradesCount = 2) {
+export function parseLogFile(rawText, feePerRoundTripShare = 0.04, enableFees = true, dateFormatSetting = 'DD-MM-YY', timezone = 'US_EASTERN', journalTopTradesCount = 2) {
     if (!rawText || typeof rawText !== 'string') return null;
     const trimmed = rawText.trim();
 
@@ -943,7 +951,7 @@ export function parseLogFile(rawText, feePerRoundTripShare = 0.05, enableFees = 
                 const roundTripShares = parseInt(manual.roundTripShares ?? manual.totalShares ?? 0, 10) || totalShares;
                 
                 // Dynamic Fee Calculation:
-                // If fees are enabled, compute fees from round-trip shares (e.g. 55 shares * $0.05 = $2.75)
+                // If fees are enabled, compute fees from round-trip shares (e.g. 55 shares * $0.04 = $2.20)
                 // unless explicitly provided in manual payload
                 let calculatedFees = 0;
                 if (enableFees) {
@@ -1043,66 +1051,65 @@ export function parseLogFile(rawText, feePerRoundTripShare = 0.05, enableFees = 
 /**
  * Compile Stock x Time Heatmap Matrix (Per-Stock Best/Worst Trading Window)
  */
-export function compileStockTimeMatrix(executions, feePerShare = 0.05, enableFees = true, timezone = 'US_EASTERN') {
-    if (!executions || executions.length === 0) return { matrix: [], goldenWindow: null, dangerWindow: null, tickerInsights: {} };
+export function compileStockTimeMatrix(executions, feePerShare = 0.04, enableFees = true, timezone = 'US_EASTERN') {
+    if (!executions || executions.length === 0) return { matrix: [], goldenWindow: null, dangerWindow: null, tickerInsights: {}, timeSlots: [], slotLabels: {}, slotDefinitions: [] };
 
     const trades = matchTradesFIFO(executions);
-    const isIst = timezone === 'INDIA_IST';
+    const refDate = executions[0]?.dateObj ? executions[0].dateObj.toISOString().split('T')[0] : null;
 
     // Comprehensive slot definitions across Premarket, Regular Market Hours, and After-Hours
-    const slotDefinitions = [
-        // Premarket Slots (US EDT)
-        { key: '04:00-07:00', isExtended: true, phase: 'PRE', label: isIst ? '01:30 - 04:30 PM (IST) [PRE]' : '04:00 - 07:00 AM (EDT) [PRE]' },
-        { key: '07:00-08:00', isExtended: true, phase: 'PRE', label: isIst ? '04:30 - 05:30 PM (IST) [PRE]' : '07:00 - 08:00 AM (EDT) [PRE]' },
-        { key: '08:00-09:00', isExtended: true, phase: 'PRE', label: isIst ? '05:30 - 06:30 PM (IST) [PRE]' : '08:00 - 09:00 AM (EDT) [PRE]' },
-        { key: '09:00-09:30', isExtended: true, phase: 'PRE', label: isIst ? '06:30 - 07:00 PM (IST) [PRE]' : '09:00 - 09:30 AM (EDT) [PRE]' },
+    const rawSlotDefs = [
+        // Premarket Slots (US 04:00 - 09:30)
+        { key: '04:00-07:00', startH: 4, startM: 0, endH: 7, endM: 0, isExtended: true, phase: 'PRE' },
+        { key: '07:00-08:00', startH: 7, startM: 0, endH: 8, endM: 0, isExtended: true, phase: 'PRE' },
+        { key: '08:00-09:00', startH: 8, startM: 0, endH: 9, endM: 0, isExtended: true, phase: 'PRE' },
+        { key: '09:00-09:30', startH: 9, startM: 0, endH: 9, endM: 30, isExtended: true, phase: 'PRE' },
 
-        // Core Regular Market Hours (US EDT: 09:30 AM - 04:00 PM)
-        { key: '09:30-10:00', isExtended: false, phase: 'REG', label: isIst ? '07:00 - 07:30 PM (IST)' : '09:30 - 10:00 AM (EDT)' },
-        { key: '10:00-10:30', isExtended: false, phase: 'REG', label: isIst ? '07:30 - 08:00 PM (IST)' : '10:00 - 10:30 AM (EDT)' },
-        { key: '10:30-11:00', isExtended: false, phase: 'REG', label: isIst ? '08:00 - 08:30 PM (IST)' : '10:30 - 11:00 AM (EDT)' },
-        { key: '11:00-12:00', isExtended: false, phase: 'REG', label: isIst ? '08:30 - 09:30 PM (IST)' : '11:00 - 12:00 PM (EDT)' },
-        { key: '12:00-13:00', isExtended: false, phase: 'REG', label: isIst ? '09:30 - 10:30 PM (IST)' : '12:00 - 01:00 PM (EDT)' },
-        { key: '13:00-14:00', isExtended: false, phase: 'REG', label: isIst ? '10:30 - 11:30 PM (IST)' : '01:00 - 02:00 PM (EDT)' },
-        { key: '14:00-15:00', isExtended: false, phase: 'REG', label: isIst ? '11:30 - 12:30 AM (IST)' : '02:00 - 03:00 PM (EDT)' },
-        { key: '15:00-16:00', isExtended: false, phase: 'REG', label: isIst ? '12:30 - 01:30 AM (IST)' : '03:00 - 04:00 PM (EDT)' },
+        // Core Regular Market Hours (US 09:30 - 16:00)
+        { key: '09:30-10:00', startH: 9, startM: 30, endH: 10, endM: 0, isExtended: false, phase: 'REG' },
+        { key: '10:00-10:30', startH: 10, startM: 0, endH: 10, endM: 30, isExtended: false, phase: 'REG' },
+        { key: '10:30-11:00', startH: 10, startM: 30, endH: 11, endM: 0, isExtended: false, phase: 'REG' },
+        { key: '11:00-12:00', startH: 11, startM: 0, endH: 12, endM: 0, isExtended: false, phase: 'REG' },
+        { key: '12:00-13:00', startH: 12, startM: 0, endH: 13, endM: 0, isExtended: false, phase: 'REG' },
+        { key: '13:00-14:00', startH: 13, startM: 0, endH: 14, endM: 0, isExtended: false, phase: 'REG' },
+        { key: '14:00-15:00', startH: 14, startM: 0, endH: 15, endM: 0, isExtended: false, phase: 'REG' },
+        { key: '15:00-16:00', startH: 15, startM: 0, endH: 16, endM: 0, isExtended: false, phase: 'REG' },
 
-        // Postmarket / After-Hours Slots (US EDT)
-        { key: '16:00-17:00', isExtended: true, phase: 'POST', label: isIst ? '01:30 - 02:30 AM (IST) [POST]' : '04:00 - 05:00 PM (EDT) [POST]' },
-        { key: '17:00-18:00', isExtended: true, phase: 'POST', label: isIst ? '02:30 - 03:30 AM (IST) [POST]' : '05:00 - 06:00 PM (EDT) [POST]' },
-        { key: '18:00-20:00', isExtended: true, phase: 'POST', label: isIst ? '03:30 - 05:30 AM (IST) [POST]' : '06:00 - 08:00 PM (EDT) [POST]' }
+        // Postmarket / After-Hours Slots (US 16:00 - 20:00)
+        { key: '16:00-17:00', startH: 16, startM: 0, endH: 17, endM: 0, isExtended: true, phase: 'POST' },
+        { key: '17:00-18:00', startH: 17, startM: 0, endH: 18, endM: 0, isExtended: true, phase: 'POST' },
+        { key: '18:00-20:00', startH: 18, startM: 0, endH: 20, endM: 0, isExtended: true, phase: 'POST' }
     ];
 
+    const slotDefinitions = rawSlotDefs.map(def => ({
+        ...def,
+        label: formatSlotLabel(def.startH, def.startM, def.endH, def.endM, refDate, timezone, def.phase)
+    }));
+
     const slotLabels = {};
+    const slotPhases = {};
     const allSlotKeys = [];
     slotDefinitions.forEach(def => {
         slotLabels[def.key] = def.label;
+        slotPhases[def.key] = def.phase;
         allSlotKeys.push(def.key);
     });
 
     // Helper to determine exact slotKey from hour and minute in US Eastern
     function getSlotKey(h, m) {
-        if (h < 7) return '04:00-07:00';
-        if (h === 7) return '07:00-08:00';
-        if (h === 8) return '08:00-09:00';
-        if (h === 9 && m < 30) return '09:00-09:30';
-        if (h === 9 && m >= 30) return '09:30-10:00';
-        if (h === 10 && m < 30) return '10:00-10:30';
-        if (h === 10 && m >= 30) return '10:30-11:00';
-        if (h === 11) return '11:00-12:00';
-        if (h === 12) return '12:00-13:00';
-        if (h === 13) return '13:00-14:00';
-        if (h === 14) return '14:00-15:00';
-        if (h === 15) return '15:00-16:00';
-        if (h === 16) return '16:00-17:00';
-        if (h === 17) return '17:00-18:00';
+        for (const def of rawSlotDefs) {
+            const startMinutes = def.startH * 60 + def.startM;
+            const endMinutes = def.endH * 60 + def.endM;
+            const currentMinutes = h * 60 + m;
+            if (currentMinutes >= startMinutes && currentMinutes < endMinutes) return def.key;
+        }
         return '18:00-20:00';
     }
 
     // Initialize all slots for overall aggregates
     const overallSlots = {};
     allSlotKeys.forEach(s => {
-        overallSlots[s] = { slotKey: s, slotLabel: slotLabels[s], pnl: 0, tradesCount: 0, wins: 0, volume: 0 };
+        overallSlots[s] = { slotKey: s, slotLabel: slotLabels[s], phase: slotPhases[s], pnl: 0, tradesCount: 0, wins: 0, volume: 0 };
     });
 
     const stockSlots = {};
@@ -1149,7 +1156,7 @@ export function compileStockTimeMatrix(executions, feePerShare = 0.05, enableFee
         if (!stockSlots[sym]) {
             stockSlots[sym] = { symbol: sym, slots: {} };
             allSlotKeys.forEach(s => {
-                stockSlots[sym].slots[s] = { slotKey: s, pnl: 0, tradesCount: 0, wins: 0, volume: 0 };
+                stockSlots[sym].slots[s] = { slotKey: s, slotLabel: slotLabels[s], phase: slotPhases[s], pnl: 0, tradesCount: 0, wins: 0, volume: 0 };
             });
         }
         stockSlots[sym].slots[slotKey].pnl += net;
@@ -1204,12 +1211,12 @@ export function compileStockTimeMatrix(executions, feePerShare = 0.05, enableFee
     };
 }
 
-export function compileDailyStats(executions, feePerRoundTripShare = 0.05, enableFees = true, timezone = 'US_EASTERN') {
+export function compileDailyStats(executions, feePerRoundTripShare = 0.04, enableFees = true, timezone = 'US_EASTERN') {
     if (!executions || executions.length === 0) return null;
     return compileSingleDayAnalytics(executions, feePerRoundTripShare, enableFees, timezone);
 }
 
-export function compileOverallAnalytics(trades, dailyStatsMap, feePerRoundTripShare = 0.05, enableFees = true) {
+export function compileOverallAnalytics(trades, dailyStatsMap, feePerRoundTripShare = 0.04, enableFees = true) {
     if (!trades || trades.length === 0) {
         return {
             totalPnl: 0,
@@ -1467,7 +1474,7 @@ export function compileECNAnalytics(executions) {
     };
 }
 
-export function compileHourlyAnalytics(executions, feePerShare = 0.05, enableFees = true, timezone = 'US_EASTERN') {
+export function compileHourlyAnalytics(executions, feePerShare = 0.04, enableFees = true, timezone = 'US_EASTERN') {
     const res = compileStockTimeMatrix(executions, feePerShare, enableFees, timezone);
     const activeSlots = (res.timeSlots || []).map(slotKey => res.overallSlots?.[slotKey]).filter(Boolean);
     return activeSlots.map(item => {

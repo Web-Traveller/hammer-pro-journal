@@ -26,7 +26,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { formatTimeLabel, isDarkpool } from '../../parser';
-import { formatDisplayDate } from '../../services/timeService';
+import { formatDisplayDate, getTimezoneDisplayTitle, getSessionPhaseRanges } from '../../services/timeService';
 import { getEquityGradient, getIntradayChartOptions } from '../../utils/chartConfig';
 
 const monthNames = [
@@ -435,7 +435,7 @@ export function SingleSessionView({
                 Intraday Realized Equity Curve ({formatDisplayDate(sessionDate)})
               </span>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Timezone: {timezone === 'INDIA_IST' ? '🇮🇳 Indian Standard Time (IST)' : '🇺🇸 US Eastern Market Time (EDT)'}
+                Timezone: {getTimezoneDisplayTitle(sessionDate, timezone)}
               </span>
             </div>
             <div className="chart-container">
@@ -454,7 +454,7 @@ export function SingleSessionView({
                   </span>
                 </div>
                 <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                  Premarket (04:00 - 09:30 EDT) • Regular Hours (09:30 - 16:00 EDT) • After-Hours (16:00 - 20:00 EDT)
+                  {singleSessionAnalytics.sessionPhases?.summaryLabel || getSessionPhaseRanges(sessionDate, timezone).summaryLabel}
                 </span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
@@ -748,8 +748,10 @@ export function SingleSessionView({
                         <tr>
                           <th>Stock Ticker</th>
                           {(singleSessionAnalytics.stockTimeMatrix.timeSlots || []).map(slotKey => {
-                            const isPre = slotKey < '09:30-10:00';
-                            const isPost = slotKey >= '16:00-17:00';
+                            const slotDef = singleSessionAnalytics.stockTimeMatrix.slotDefinitions?.find(d => d.key === slotKey);
+                            const phase = slotDef?.phase || (slotKey < '09:30-10:00' ? 'PRE' : slotKey >= '16:00-17:00' ? 'POST' : 'REG');
+                            const isPre = phase === 'PRE';
+                            const isPost = phase === 'POST';
                             return (
                               <th 
                                 key={slotKey}

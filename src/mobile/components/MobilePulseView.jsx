@@ -106,7 +106,7 @@ export function MobilePulseView({
     ]
   };
 
-  const chartOptions = getIntradayChartOptions(false);
+  const chartOptions = getIntradayChartOptions(curvePoints);
 
   return (
     <div className="mobile-view-container">

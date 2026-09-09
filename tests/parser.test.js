@@ -220,4 +220,19 @@ describe('Level 2 Tape Scalper Financial Math Engine', () => {
       expect(isDarkpool('DPOOL')).toBe(true);
     });
   });
+
+  describe('5. Default Trading Fees ($0.04 per trade / round-trip share)', () => {
+    it('calculates default fee at $0.04 per round-trip share when fee parameter is omitted', () => {
+      const execs = [
+        { symbol: 'AAPL', action: 'Bought', execQty: 100, execPrice: 150.0, dateObj: createUSMarketDate('2026-09-04', '10:00:00'), route: 'ARCA', orderDesc: '' },
+        { symbol: 'AAPL', action: 'Sold', execQty: 100, execPrice: 151.0, dateObj: createUSMarketDate('2026-09-04', '10:05:00'), route: 'ARCA', orderDesc: '' }
+      ];
+
+      // Default fee parameter is $0.04 per round-trip share (100 shares * $0.04 = $4.00 fee)
+      const analytics = compileSingleDayAnalytics(execs);
+      expect(analytics.grossPnl).toBe(100.00);
+      expect(analytics.fees).toBe(4.00);
+      expect(analytics.netPnl).toBe(96.00);
+    });
+  });
 });

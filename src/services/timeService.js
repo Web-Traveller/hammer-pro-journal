@@ -114,22 +114,98 @@ export function isDaylightSavingTime(date) {
 }
 
 /**
+ * Gets dynamic short timezone badge ('EDT', 'EST', 'IST', etc.)
+ */
+export function getTimezoneBadge(date, timezone = 'US_EASTERN') {
+  if (timezone === 'INDIA_IST') return 'IST';
+  if (timezone === 'US_EASTERN' || !timezone) {
+    return isDaylightSavingTime(date) ? 'EDT' : 'EST';
+  }
+  try {
+    const d = date instanceof Date ? date : new Date(date || Date.now());
+    const tz = TIMEZONES[timezone] || timezone;
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      timeZoneName: 'short'
+    }).formatToParts(d);
+    const tzPart = parts.find(p => p.type === 'timeZoneName');
+    return tzPart ? tzPart.value : 'LOCAL';
+  } catch (e) {
+    return 'LOCAL';
+  }
+}
+
+/**
+ * Gets dynamic localized full display title for chart/session headers
+ */
+export function getTimezoneDisplayTitle(date, timezone = 'US_EASTERN') {
+  const badge = getTimezoneBadge(date, timezone);
+  if (timezone === 'INDIA_IST') {
+    return '🇮🇳 Indian Standard Time (IST)';
+  }
+  if (timezone === 'US_EASTERN' || !timezone) {
+    return `🇺🇸 US Eastern Market Time (${badge})`;
+  }
+  return `🌐 Local Time (${badge})`;
+}
+
+/**
  * Formats full date & time with timezone abbreviation tag (e.g. "09:34:12 AM EDT" or "07:04:12 PM IST")
  */
 export function formatTimeWithZoneBadge(date, timezone = 'US_EASTERN') {
   try {
-    if (!date) return { time: '--:--:--', badge: timezone === 'INDIA_IST' ? 'IST' : 'EDT' };
+    if (!date) return { time: '--:--:--', badge: getTimezoneBadge(null, timezone) };
     const timeStr = formatInTimezone(date, timezone, { hour12: true });
-    let badge = 'EDT';
-    if (timezone === 'INDIA_IST') {
-      badge = 'IST';
-    } else {
-      badge = isDaylightSavingTime(date) ? 'EDT' : 'EST';
-    }
+    const badge = getTimezoneBadge(date, timezone);
     return { time: timeStr, badge };
   } catch (e) {
     return { time: '--:--:--', badge: 'US' };
   }
+}
+
+/**
+ * Generates dynamic session phase time ranges in the target timezone
+ * Premarket (04:00-09:30 US), Regular (09:30-16:00 US), After-Hours (16:00-20:00 US)
+ */
+export function getSessionPhaseRanges(dateStr = null, timezone = 'US_EASTERN') {
+  const baseDate = dateStr || new Date().toISOString().split('T')[0];
+  const dPreStart = createUSMarketDate(baseDate, '04:00:00');
+  const dPreEnd = createUSMarketDate(baseDate, '09:30:00');
+  const dRegStart = createUSMarketDate(baseDate, '09:30:00');
+  const dRegEnd = createUSMarketDate(baseDate, '16:00:00');
+  const dPostStart = createUSMarketDate(baseDate, '16:00:00');
+  const dPostEnd = createUSMarketDate(baseDate, '20:00:00');
+
+  const fmt = (d) => formatInTimezone(d, timezone, { hour: '2-digit', minute: '2-digit', hour12: true });
+  const badge = getTimezoneBadge(dPreStart, timezone);
+
+  const preLabel = `${fmt(dPreStart)} - ${fmt(dPreEnd)}`;
+  const regLabel = `${fmt(dRegStart)} - ${fmt(dRegEnd)}`;
+  const postLabel = `${fmt(dPostStart)} - ${fmt(dPostEnd)}`;
+
+  return {
+    badge,
+    premarket: { start: fmt(dPreStart), end: fmt(dPreEnd), label: `${preLabel} ${badge} (PRE)` },
+    regular: { start: fmt(dRegStart), end: fmt(dRegEnd), label: `${regLabel} ${badge} (RTH)` },
+    postmarket: { start: fmt(dPostStart), end: fmt(dPostEnd), label: `${postLabel} ${badge} (POST)` },
+    summaryLabel: `Premarket (${preLabel} ${badge}) • Regular Hours (${regLabel} ${badge}) • After-Hours (${postLabel} ${badge})`
+  };
+}
+
+/**
+ * Formats a specific time window into a localized label (e.g. "09:30 - 10:00 AM (EDT)")
+ */
+export function formatSlotLabel(startH, startM, endH, endM, dateStr = null, timezone = 'US_EASTERN', phase = 'REG') {
+  const baseDate = dateStr || new Date().toISOString().split('T')[0];
+  const pad = (n) => String(n).padStart(2, '0');
+  const dStart = createUSMarketDate(baseDate, `${pad(startH)}:${pad(startM)}:00`);
+  const dEnd = createUSMarketDate(baseDate, `${pad(endH)}:${pad(endM)}:00`);
+
+  const fmt = (d) => formatInTimezone(d, timezone, { hour: '2-digit', minute: '2-digit', hour12: true });
+  const badge = getTimezoneBadge(dStart, timezone);
+
+  const phaseTag = phase === 'PRE' ? ' [PRE]' : phase === 'POST' ? ' [POST]' : '';
+  return `${fmt(dStart)} - ${fmt(dEnd)} (${badge})${phaseTag}`;
 }
 
 /**
