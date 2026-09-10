@@ -155,6 +155,8 @@ export function MandatoryAuthGateModal({ isOpen = false, onAuthenticated, onToas
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
         zIndex: 99999,
+        pointerEvents: 'auto',
+        userSelect: 'auto',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

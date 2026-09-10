@@ -42,6 +42,7 @@ async function checkTauriUpdate() {
     const { check } = await import('@tauri-apps/plugin-updater');
     return await check();
   } catch (err) {
+    console.error('[UPDATER] Tauri updater check failed:', err);
     return null;
   }
 }
@@ -620,6 +621,7 @@ export function useTradingState() {
         showToast("You are on the latest version!", "info");
       }
     } catch (e) {
+      console.error('[UPDATER] Manual update check error:', e);
       setUpdateStatus("Update check completed. Running latest build.");
       showToast("Running latest version.", "info");
     } finally {

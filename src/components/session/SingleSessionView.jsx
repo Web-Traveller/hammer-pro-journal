@@ -518,6 +518,35 @@ export function SingleSessionView({
             </div>
           )}
 
+          {/* Session Attached Screenshots Section (Below Chart) */}
+          <div className="card" style={{ marginBottom: '1.25rem' }}>
+            <div className="card-top">
+              <span className="card-title" style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 700 }}>
+                Session Attached Screenshots ({sessionScreenshots ? sessionScreenshots.length : 0})
+              </span>
+              <label className="btn btn-secondary" style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem', cursor: 'pointer' }}>
+                <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={onAddScreenshots} />
+                <Plus size={14} /> Add Screenshot
+              </label>
+            </div>
+            {sessionScreenshots && sessionScreenshots.length > 0 ? (
+              <div className="screenshot-grid">
+                {sessionScreenshots.map((img, idx) => (
+                  <div key={idx} className="screenshot-card" onClick={() => onOpenLightbox(img.dataUrl)}>
+                    <img src={img.dataUrl} alt={`Session Screenshot ${idx + 1}`} />
+                    <button className="delete-btn" onClick={(e) => { e.stopPropagation(); onDeleteScreenshot(img.filename); }}>
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '0.5rem 0' }}>
+                No closing screenshots attached for this session yet. Click "+ Add Screenshot" to upload chart or Level 2 tape captures.
+              </div>
+            )}
+          </div>
+
           {/* Sub-tab Navigation Bar */}
           <div className="tab-bar">
             <button 
@@ -533,16 +562,22 @@ export function SingleSessionView({
               <Clock size={15} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Stock × Time Matrix
             </button>
             <button 
-              className={`tab-btn ${(sessionTab === 'scalper' || sessionTab === 'ecn') ? 'active' : ''}`}
+              className={`tab-btn ${sessionTab === 'scalper' ? 'active' : ''}`}
               onClick={() => setSessionTab('scalper')}
             >
-              <Zap size={15} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Hold Speed &amp; Route Venues
+              <Zap size={15} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Hold Speed &amp; Scalper
+            </button>
+            <button 
+              className={`tab-btn ${sessionTab === 'ecn' ? 'active' : ''}`}
+              onClick={() => setSessionTab('ecn')}
+            >
+              <Layers size={15} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> ECN &amp; Darkpool Routes
             </button>
             <button 
               className={`tab-btn ${sessionTab === 'journal' ? 'active' : ''}`}
               onClick={() => setSessionTab('journal')}
             >
-              <BookOpen size={15} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Session Journal {sessionScreenshots && sessionScreenshots.length > 0 ? `(${sessionScreenshots.length})` : ''}
+              <BookOpen size={15} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Session Journal
             </button>
             <button 
               className={`tab-btn ${sessionTab === 'raw' ? 'active' : ''}`}
@@ -802,8 +837,8 @@ export function SingleSessionView({
             )
           )}
 
-          {/* TAB 3: TAPE SCALPER HOLD SPEED & ROUTE VENUES */}
-          {(sessionTab === 'scalper' || sessionTab === 'ecn') && (
+          {/* TAB 3: TAPE SCALPER & SPEED BREAKDOWN */}
+          {sessionTab === 'scalper' && (
             <div>
               {/* Hold Speed Metrics Grid */}
               <div className="card" style={{ marginBottom: '1.25rem' }}>
@@ -844,56 +879,58 @@ export function SingleSessionView({
                   {scalperScatterData && <Scatter data={scalperScatterData} options={scalperScatterOptions} />}
                 </div>
               </div>
+            </div>
+          )}
 
-              {/* Consolidated ECN Route & Darkpool Execution Fills */}
-              <div className="card" style={{ marginTop: '1.25rem' }}>
-                <div className="card-top">
-                  <span className="card-title" style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 700 }}>
-                    Session ECN Route &amp; Darkpool Execution Fills ({sessionDate})
-                  </span>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    Aggregated volume and fill count by execution venue &amp; liquidity pool
-                  </span>
-                </div>
-                <div className="table-container">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Route Venue</th>
-                        <th>Type</th>
-                        <th>Executed Volume</th>
-                        <th>Fills Count</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(singleSessionAnalytics.ecnBreakdown || []).length > 0 ? (
-                        (singleSessionAnalytics.ecnBreakdown || []).map((r) => (
-                          <tr key={r.route}>
-                            <td style={{ fontWeight: 800 }}>{r.route}</td>
-                            <td>
-                              <span className={`badge ${r.isDarkpool ? 'badge-darkpool' : 'badge-route'}`}>
-                                {r.isDarkpool ? 'Darkpool' : 'ECN'}
-                              </span>
-                            </td>
-                            <td style={{ fontWeight: 700 }}>{r.volume?.toLocaleString()} shares</td>
-                            <td>{r.fills} fills</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
-                            No specific ECN route execution fills recorded for this session.
+          {/* TAB 4: ECN & ROUTE BREAKDOWN */}
+          {sessionTab === 'ecn' && (
+            <div className="card">
+              <div className="card-top">
+                <span className="card-title" style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 700 }}>
+                  Session ECN Route &amp; Darkpool Execution Fills ({sessionDate})
+                </span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Aggregated volume and fill count by execution venue &amp; liquidity pool
+                </span>
+              </div>
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Route Venue</th>
+                      <th>Type</th>
+                      <th>Executed Volume</th>
+                      <th>Fills Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(singleSessionAnalytics.ecnBreakdown || []).length > 0 ? (
+                      (singleSessionAnalytics.ecnBreakdown || []).map((r) => (
+                        <tr key={r.route}>
+                          <td style={{ fontWeight: 800 }}>{r.route}</td>
+                          <td>
+                            <span className={`badge ${r.isDarkpool ? 'badge-darkpool' : 'badge-route'}`}>
+                              {r.isDarkpool ? 'Darkpool' : 'ECN'}
+                            </span>
                           </td>
+                          <td style={{ fontWeight: 700 }}>{r.volume?.toLocaleString()} shares</td>
+                          <td>{r.fills} fills</td>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
+                          No specific ECN route execution fills recorded for this session.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
 
-          {/* TAB 4: SESSION JOURNAL & ATTACHED SCREENSHOTS */}
+          {/* TAB 5: SESSION JOURNAL */}
           {sessionTab === 'journal' && (
             <div>
               <div className="journal-highlight-grid">
@@ -948,39 +985,10 @@ export function SingleSessionView({
                   </button>
                 </div>
               </div>
-
-              {/* Session Attached Screenshots Section */}
-              <div className="card" style={{ marginTop: '1.25rem' }}>
-                <div className="card-top">
-                  <span className="card-title" style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 700 }}>
-                    Session Attached Screenshots ({sessionScreenshots ? sessionScreenshots.length : 0})
-                  </span>
-                  <label className="btn btn-secondary" style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem', cursor: 'pointer' }}>
-                    <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={onAddScreenshots} />
-                    <Plus size={14} /> Add Screenshot
-                  </label>
-                </div>
-                {sessionScreenshots && sessionScreenshots.length > 0 ? (
-                  <div className="screenshot-grid">
-                    {sessionScreenshots.map((img, idx) => (
-                      <div key={idx} className="screenshot-card" onClick={() => onOpenLightbox(img.dataUrl)}>
-                        <img src={img.dataUrl} alt={`Session Screenshot ${idx + 1}`} />
-                        <button className="delete-btn" onClick={(e) => { e.stopPropagation(); onDeleteScreenshot(img.filename); }}>
-                          <X size={12} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '0.5rem 0' }}>
-                    No closing screenshots attached for this session yet. Click "+ Add Screenshot" to upload chart or Level 2 tape captures.
-                  </div>
-                )}
-              </div>
             </div>
           )}
 
-          {/* TAB 5: RAW LOG EDITOR */}
+          {/* TAB 6: RAW LOG EDITOR */}
           {sessionTab === 'raw' && (
             <div className="card">
               <div className="card-top" style={{ marginBottom: '0.75rem' }}>

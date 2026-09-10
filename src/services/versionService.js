@@ -216,7 +216,7 @@ export async function checkAndApplySilentUpdate(forceUpdate = false, onToast = n
       return update;
     }
   } catch (err) {
-    console.warn('[UPDATER] Background check error:', err);
+    console.error('[UPDATER] Tauri updater background check error:', err);
   }
   return null;
 }

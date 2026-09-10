@@ -171,10 +171,7 @@ export default function App() {
   }
 
   return (
-    <div
-      className="app-container"
-      style={(!state.userProfile || !state.userProfile.id) ? { pointerEvents: 'none', userSelect: 'none' } : undefined}
-    >
+    <div className="app-container">
       {/* Floating Toast Notification Container */}
       {state.toastMessage && (
         <div className="toast-container">
