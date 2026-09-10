@@ -184,7 +184,7 @@ export function useImportHandlers({
     try {
       await saveLogToStorage(sessionDateStr, payload, activeAccountId);
       if (pendingScreenshots.length > 0) {
-        await saveScreenshotsToStorage(sessionDateStr, pendingScreenshots);
+        await saveScreenshotsToStorage(sessionDateStr, pendingScreenshots, activeAccountId);
       }
       if (manualData.notes) {
         await saveJournalToStorage(sessionDateStr, manualData.notes, activeAccountId);
@@ -217,7 +217,7 @@ export function useImportHandlers({
     try {
       await saveLogToStorage(dateToUse, pastedText, activeAccountId);
       if (pendingScreenshots.length > 0) {
-        await saveScreenshotsToStorage(dateToUse, pendingScreenshots);
+        await saveScreenshotsToStorage(dateToUse, pendingScreenshots, activeAccountId);
       }
       const updatedLogs = { ...logs, [dateToUse]: pastedText };
       setLogs(updatedLogs);

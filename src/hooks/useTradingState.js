@@ -355,7 +355,7 @@ export function useTradingState() {
     }, 5 * 60 * 1000);
 
     return () => clearInterval(syncInterval);
-  }, [dailyStatsMap]);
+  }, [dailyStatsMap, activeAccountId]);
 
   // Window Focus Sync (Rate-limited to 60s cooldown)
   useEffect(() => {

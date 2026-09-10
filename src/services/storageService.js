@@ -322,7 +322,7 @@ export async function removeLog(date, accountId = 'default') {
   markSessionAsDeleted(cleanDate, previousContent, safeAccountId);
 
   await safeTauriInvoke("delete_log", { date: cleanDate, accountId: safeAccountId });
-  await idbDeleteSessionScreenshots(cleanDate);
+  await idbDeleteSessionScreenshots(cleanDate, safeAccountId);
 
   try {
     localStorage.removeItem(logKey);
@@ -357,8 +357,9 @@ export async function loadScreenshotsFromStorage(date, accountId = 'default') {
     }
   }
 
-  // 2. Try IndexedDB
-  const idbImgs = await idbLoadScreenshots(cleanDate);
+  // 2. Try IndexedDB (account-scoped)
+  const safeAccountId2 = (accountId || 'default');
+  const idbImgs = await idbLoadScreenshots(cleanDate, safeAccountId2);
   if (idbImgs && idbImgs.length > 0) {
     return idbImgs;
   }
@@ -396,8 +397,8 @@ export async function saveScreenshotsToStorage(date, screenshots, accountId = 'd
       });
     }
 
-    // Also persist in IndexedDB for resilience
-    await idbSaveScreenshot(cleanDate, img.filename, img.dataUrl);
+    // Also persist in IndexedDB for resilience (account-scoped)
+    await idbSaveScreenshot(cleanDate, img.filename, img.dataUrl, accountId);
   }
 }
 
@@ -410,7 +411,7 @@ export async function deleteScreenshotFromStorage(date, filename, accountId = 'd
     await safeTauriInvoke("delete_screenshot", { filename: finalName, accountId });
   }
 
-  await idbDeleteScreenshot(cleanDate, filename);
+  await idbDeleteScreenshot(cleanDate, filename, accountId);
 
   try {
     localStorage.removeItem(`trading_img_${cleanDate}_${filename}`);
@@ -509,10 +510,13 @@ export async function restoreBackupSnapshot(snapshot) {
     throw new Error("Invalid backup file: missing trading logs.");
   }
 
-  // Restore Logs
+  // Use the accountId baked into the snapshot — never default blindly to 'default'
+  const restoreAccountId = snapshot.accountId || 'default';
+
+  // Restore Logs into the correct account namespace
   for (const [date, content] of Object.entries(snapshot.logs)) {
     if (date && typeof content === 'string') {
-      await persistLog(date, content);
+      await persistLog(date, content, restoreAccountId);
     }
   }
 
@@ -525,11 +529,11 @@ export async function restoreBackupSnapshot(snapshot) {
     }
   }
 
-  // Restore Screenshots
+  // Restore Screenshots into the correct account namespace
   if (snapshot.screenshots && typeof snapshot.screenshots === 'object') {
     for (const [date, imgs] of Object.entries(snapshot.screenshots)) {
       if (date && Array.isArray(imgs)) {
-        await saveScreenshotsToStorage(date, imgs);
+        await saveScreenshotsToStorage(date, imgs, restoreAccountId);
       }
     }
   }
