@@ -101,9 +101,13 @@ jobs:
           echo "Found RAW APK: $RAW_APK"
           if [ -n "$RAW_APK" ]; then
             APP_VER=$(node -p "require('./package.json').version")
-            keytool -genkey -v -keystore release.keystore -alias hammerpro -keyalg RSA -keysize 2048 -validity 10000 -storepass hammerpro123 -keypass hammerpro123 -dname "CN=HammerPro, OU=Trading, O=HammerPro, L=US, S=NY, C=US"
+            KEYSTORE_FILE="src-tauri/release.keystore"
+            if [ ! -f "$KEYSTORE_FILE" ]; then
+              echo "Generating persistent keystore..."
+              keytool -genkey -v -keystore "$KEYSTORE_FILE" -alias hammerpro -keyalg RSA -keysize 2048 -validity 10000 -storepass hammerpro123 -keypass hammerpro123 -dname "CN=HammerPro, OU=Trading, O=HammerPro, L=US, ST=NY, C=US"
+            fi
             $ANDROID_HOME/build-tools/34.0.0/zipalign -v -p 4 "$RAW_APK" ./aligned.apk
-            $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks release.keystore --ks-pass pass:hammerpro123 --ks-key-alias hammerpro --key-pass pass:hammerpro123 --out ./HammerPro-Journal-v${APP_VER}-Android.apk ./aligned.apk
+            $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks "$KEYSTORE_FILE" --ks-pass pass:hammerpro123 --ks-key-alias hammerpro --key-pass pass:hammerpro123 --out ./HammerPro-Journal-v${APP_VER}-Android.apk ./aligned.apk
             $ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose ./HammerPro-Journal-v${APP_VER}-Android.apk
             echo "apk_path=./HammerPro-Journal-v${APP_VER}-Android.apk" >> $GITHUB_OUTPUT
           fi

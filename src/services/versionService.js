@@ -1,6 +1,6 @@
 /**
  * Dynamic Version Gate & 7-Day Hard Expiry Manager
- * Ensures out-of-date apps are blocked after a 7-day grace period
+ * Supports Desktop (Windows Tauri) and Mobile (Android Tauri / Web)
  */
 
 import { supabase } from './supabaseClient';
@@ -10,7 +10,7 @@ export const CURRENT_APP_VERSION = APP_VERSION;
 const OUTDATED_DETECTED_KEY = 'hammer_outdated_first_seen';
 
 /**
- * Compare two semver version strings (e.g. "2.0.0" vs "1.0.3")
+ * Compare two semver version strings (e.g. "2.3.3" vs "2.3.1")
  * Returns: 1 if v1 > v2, -1 if v1 < v2, 0 if equal
  */
 export function compareSemver(v1, v2) {
@@ -28,59 +28,99 @@ export function compareSemver(v1, v2) {
 }
 
 /**
- * Check version status against Supabase app_config with 7-day hard expiry enforcement
+ * Check version status against latest manifest and Supabase app_config
  */
 export async function checkAppVersionStatus() {
   try {
-    const isTauriDesktop = typeof window !== 'undefined' && (window.__TAURI_INTERNALS__ !== undefined || window.__TAURI__ !== undefined);
-    const hasMobileUA = typeof window !== 'undefined' && /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent || '');
-    const isCapacitor = typeof window !== 'undefined' && (window.Capacitor !== undefined || window.isNativeMobile === true);
-    
-    // Explicit platform decision
-    const isMobile = (hasMobileUA || isCapacitor) && !isTauriDesktop;
+    // Robust platform detection
+    const isAndroid = typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent || '');
+    const isIOS = typeof navigator !== 'undefined' && /iphone|ipad|ipod/i.test(navigator.userAgent || '');
+    const isMobile = isAndroid || isIOS || (typeof window !== 'undefined' && (window.Capacitor !== undefined || window.isNativeMobile === true || /mobile/i.test(navigator.userAgent || '')));
 
-    const { data: row } = await supabase
-      .from('app_config')
-      .select('value')
-      .eq('key', 'updater_config')
-      .maybeSingle();
+    // 1. Try to fetch live latest.json manifest first
+    let manifest = null;
+    const manifestUrls = [
+      'https://raw.githubusercontent.com/Web-Traveller/hammer-pro-journal/main/public/latest.json',
+      './latest.json'
+    ];
 
-    const config = row?.value || {
-      latest_version_desktop: CURRENT_APP_VERSION,
-      min_version_desktop: CURRENT_APP_VERSION,
-      latest_version_mobile: '2.0.0',
-      min_version_mobile: '2.0.0',
-      grace_period_days: 7,
-      download_url_desktop: 'https://github.com/Web-Traveller/hammer-pro-journal/releases/latest',
-      download_url_android: 'https://github.com/Web-Traveller/hammer-pro-journal/releases/latest'
-    };
+    for (const url of manifestUrls) {
+      try {
+        const res = await fetch(url, { cache: 'no-cache' });
+        if (res.ok) {
+          const json = await res.json();
+          if (json && json.version) {
+            manifest = json;
+            break;
+          }
+        }
+      } catch (err) {
+        // Continue to fallback
+      }
+    }
 
-    // Platform-Aware Independent Version & Download Routing (NO generic global fallback)
+    // 2. Fetch Supabase app_config updater_config as well
+    let supabaseConfig = null;
+    try {
+      const { data: row } = await supabase
+        .from('app_config')
+        .select('value')
+        .eq('key', 'updater_config')
+        .maybeSingle();
+      if (row?.value) {
+        supabaseConfig = row.value;
+      }
+    } catch (sbErr) {
+      // Supabase offline/unreachable fallback
+    }
+
+    // 3. Consolidate Latest & Min versions
+    const fallbackLatest = manifest?.version || CURRENT_APP_VERSION;
+
     let latestVersion = isMobile
-      ? (config.latest_version_mobile || config.mobile?.latest_version || '2.0.0')
-      : (config.latest_version_desktop || config.desktop?.latest_version || CURRENT_APP_VERSION);
+      ? (supabaseConfig?.latest_version_mobile || supabaseConfig?.mobile?.latest_version || fallbackLatest)
+      : (supabaseConfig?.latest_version_desktop || supabaseConfig?.desktop?.latest_version || fallbackLatest);
 
     let minVersion = isMobile
-      ? (config.min_version_mobile || config.mobile?.min_version || '2.0.0')
-      : (config.min_version_desktop || config.desktop?.min_version || CURRENT_APP_VERSION);
+      ? (supabaseConfig?.min_version_mobile || supabaseConfig?.mobile?.min_version || fallbackLatest)
+      : (supabaseConfig?.min_version_desktop || supabaseConfig?.desktop?.min_version || fallbackLatest);
 
-    // Sanity check: latestVersion cannot be lower than minVersion
     if (compareSemver(latestVersion, minVersion) < 0) {
       latestVersion = minVersion;
     }
 
-    const graceDays = config.grace_period_days || 7;
+    // 4. Resolve exact platform download URL
+    let downloadUrl = '';
+    if (isMobile) {
+      if (manifest?.platforms?.android?.url) {
+        downloadUrl = manifest.platforms.android.url;
+      } else if (supabaseConfig?.download_url_android) {
+        downloadUrl = supabaseConfig.download_url_android;
+      } else {
+        downloadUrl = `https://github.com/Web-Traveller/hammer-pro-journal/releases/download/v${latestVersion}/HammerPro-Journal-v${latestVersion}-Android.apk`;
+      }
+    } else {
+      if (manifest?.platforms?.['windows-x86_64']?.url) {
+        downloadUrl = manifest.platforms['windows-x86_64'].url;
+      } else if (manifest?.platforms?.['windows-x86_64-nsis']?.url) {
+        downloadUrl = manifest.platforms['windows-x86_64-nsis'].url;
+      } else if (supabaseConfig?.download_url_desktop) {
+        downloadUrl = supabaseConfig.download_url_desktop;
+      } else {
+        downloadUrl = `https://github.com/Web-Traveller/hammer-pro-journal/releases/download/v${latestVersion}/Hammer.Pro.Journal_${latestVersion}_x64-setup.exe`;
+      }
+    }
 
-    const downloadUrl = isMobile
-      ? (config.download_url_android || config.mobile?.download_url || 'https://github.com/Web-Traveller/hammer-pro-journal/releases/latest')
-      : (config.download_url_desktop || config.desktop?.download_url || 'https://github.com/Web-Traveller/hammer-pro-journal/releases/latest');
+    const graceDays = supabaseConfig?.grace_period_days || 7;
 
-    // 1. If current version is below the absolute MINIMUM required version -> Instant Force Lock
+    // 5. Version Evaluation
+    // A. Hard block if below min required version
     if (compareSemver(CURRENT_APP_VERSION, minVersion) < 0) {
       return {
         isOutdated: true,
         forceUpdate: true,
         isMobile,
+        isAndroid,
         reason: 'min_version_breached',
         currentVersion: CURRENT_APP_VERSION,
         latestVersion,
@@ -89,7 +129,7 @@ export async function checkAppVersionStatus() {
       };
     }
 
-    // 2. If current version is behind the LATEST version -> Check 7-Day Grace Period
+    // B. Check grace period if behind latest version
     if (compareSemver(CURRENT_APP_VERSION, latestVersion) < 0) {
       let firstSeen = localStorage.getItem(OUTDATED_DETECTED_KEY);
       if (!firstSeen) {
@@ -101,25 +141,25 @@ export async function checkAppVersionStatus() {
       const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
       const daysRemaining = Math.max(0, Math.ceil(graceDays - elapsedDays));
 
-      // If 7 days have elapsed without updating -> Force Lock the application
       if (elapsedDays >= graceDays) {
         return {
           isOutdated: true,
           forceUpdate: true,
           isMobile,
+          isAndroid,
           reason: 'grace_period_expired',
           currentVersion: CURRENT_APP_VERSION,
           latestVersion,
           downloadUrl,
-          message: `The 7-day grace period for updating to v${latestVersion} has expired. Please update to continue.`
+          message: `The ${graceDays}-day grace period for updating to v${latestVersion} has expired. Please update to continue.`
         };
       }
 
-      // Within 7 days -> Soft warning
       return {
         isOutdated: true,
         forceUpdate: false,
         isMobile,
+        isAndroid,
         daysRemaining,
         currentVersion: CURRENT_APP_VERSION,
         latestVersion,
@@ -128,25 +168,27 @@ export async function checkAppVersionStatus() {
       };
     }
 
-    // App is up to date! Clear any outdated tracking timestamp
+    // App is up-to-date!
     localStorage.removeItem(OUTDATED_DETECTED_KEY);
-    return { isOutdated: false, forceUpdate: false, isMobile, currentVersion: CURRENT_APP_VERSION };
+    return { isOutdated: false, forceUpdate: false, isMobile, isAndroid, currentVersion: CURRENT_APP_VERSION };
 
   } catch (e) {
-    console.warn('Version check note:', e);
+    console.warn('Version check notice:', e);
     return { isOutdated: false, forceUpdate: false, isMobile: false, currentVersion: CURRENT_APP_VERSION };
   }
 }
 
 /**
- * Silent Background Auto-Updater Engine (Referenced from ecn-trainer)
- * Checks for updates in background via @tauri-apps/plugin-updater.
- * For mandatory/force updates: downloads and installs immediately.
- * For normal updates: downloads silently in background, then binds an onCloseRequested window hook
- * to install the update when the app closes or restarts.
+ * Silent Background Auto-Updater Engine for Desktop (Tauri)
  */
 export async function checkAndApplySilentUpdate(forceUpdate = false, onToast = null) {
   try {
+    const isAndroid = typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent || '');
+    if (isAndroid) {
+      // Android does not support native silent background self-replacement; updates are handled via APK download
+      return null;
+    }
+
     if (typeof window === 'undefined' || (!window.__TAURI_INTERNALS__ && !window.__TAURI__)) {
       return null;
     }
@@ -154,22 +196,16 @@ export async function checkAndApplySilentUpdate(forceUpdate = false, onToast = n
     const update = await check();
 
     if (update && update.available) {
-      console.log('[UPDATER] New update version found:', update.version);
+      console.log('[UPDATER] New desktop update found:', update.version);
       if (forceUpdate) {
-        console.log('[UPDATER] Force update required. Downloading & installing immediately...');
         if (onToast) onToast(`Mandatory update v${update.version} downloading...`, 'info');
         await update.downloadAndInstall();
       } else {
-        console.log('[UPDATER] Normal background update. Downloading silently in background...');
-        // 100% silent background download (no user-facing toast popup)
         await update.download();
-        console.log('[UPDATER] Silent download complete. Registering exit installation hook...');
-
         try {
           const { getCurrentWindow } = await import('@tauri-apps/api/window');
           const appWindow = getCurrentWindow();
           await appWindow.onCloseRequested(async (event) => {
-            console.log('[UPDATER] Applying update silently on app exit...');
             event.preventDefault();
             await update.install();
           });
@@ -179,10 +215,8 @@ export async function checkAndApplySilentUpdate(forceUpdate = false, onToast = n
       }
       return update;
     }
-    return null;
   } catch (err) {
-    console.warn('[UPDATER] Silent update check note:', err);
-    return null;
+    console.warn('[UPDATER] Background check error:', err);
   }
+  return null;
 }
-
