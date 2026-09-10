@@ -12,7 +12,7 @@
  * - Zero hard S3 DELETE operations (DeleteObjectCommand removed)
  */
 
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { fetchAppConfig } from './supabaseClient.js';
 
 export let R2_ACCOUNT_ID = '76cdb43cd04ce3235b092defe0eeaeac';
@@ -263,3 +263,42 @@ export async function downloadScreenshotFromCloud(key) {
     return null;
   }
 }
+
+/**
+ * List all screenshot keys for a specific session from Cloudflare R2
+ */
+export async function listSessionScreenshotsFromCloud(userId, accountId = 'default', sessionDate) {
+  if (!userId || !sessionDate) return [];
+  await ensureR2Config();
+  const safeAccountId = accountId || 'default';
+  const prefix = `users/${userId}/${safeAccountId}/screenshots/${sessionDate}/`;
+  const legacyPrefix = `users/${userId}/screenshots/${sessionDate}/`;
+
+  try {
+    const client = getR2Client();
+    const command = new ListObjectsV2Command({
+      Bucket: R2_BUCKET,
+      Prefix: prefix
+    });
+    const res = await client.send(command);
+    let keys = (res.Contents || []).map(obj => obj.Key).filter(Boolean);
+
+    // Also check legacy prefix if none found
+    if (keys.length === 0 && safeAccountId === 'default') {
+      try {
+        const legCmd = new ListObjectsV2Command({
+          Bucket: R2_BUCKET,
+          Prefix: legacyPrefix
+        });
+        const legRes = await client.send(legCmd);
+        keys = (legRes.Contents || []).map(obj => obj.Key).filter(Boolean);
+      } catch (e) {}
+    }
+
+    return keys;
+  } catch (err) {
+    console.warn('[R2] List screenshots note:', err.message);
+    return [];
+  }
+}
+

@@ -29,7 +29,8 @@ import {
   uploadRawLogToCloud,
   downloadRawLogFromCloud,
   uploadScreenshotToCloud,
-  downloadScreenshotFromCloud
+  downloadScreenshotFromCloud,
+  listSessionScreenshotsFromCloud
 } from './r2StorageService.js';
 import { parseLogFile } from '../parser.js';
 import { computeContentHash } from '../utils/checksum.js';
@@ -480,6 +481,58 @@ export async function fetchOnDemandSessionLog(sessionDate, accountId = 'default'
     console.warn('Lazy fetch log warning:', err);
   }
   return null;
+}
+
+/**
+ * Fetch a single session's screenshots on-demand from Cloudflare R2 (Lazy Loading)
+ */
+export async function fetchOnDemandSessionScreenshots(sessionDate, accountId = 'default') {
+  if (!sessionDate) return [];
+  const profile = getActiveUserProfile();
+  if (!profile) return [];
+  const safeAccountId = accountId || 'default';
+
+  try {
+    let screenshotKeys = [];
+
+    // 1. Try to get keys from Master Snapshot first
+    try {
+      const master = await downloadMasterSnapshot(profile.id, safeAccountId);
+      if (master?.sessions?.[sessionDate]?.screenshotsKeys) {
+        screenshotKeys = master.sessions[sessionDate].screenshotsKeys.map(k => typeof k === 'string' ? k : (k?.key || ''));
+      }
+    } catch (e) {}
+
+    // 2. Query R2 screenshot directory prefix directly if keys are missing
+    if (screenshotKeys.length === 0) {
+      screenshotKeys = await listSessionScreenshotsFromCloud(profile.id, safeAccountId, sessionDate);
+    }
+
+    const cleanKeys = (screenshotKeys || []).filter(Boolean);
+    if (cleanKeys.length === 0) return [];
+
+    const downloadedImgs = [];
+    for (const key of cleanKeys) {
+      try {
+        const dataUrl = await downloadScreenshotFromCloud(key);
+        if (dataUrl) {
+          const filename = key.split('/').pop() || `${Date.now()}.jpg`;
+          downloadedImgs.push({ filename, dataUrl });
+        }
+      } catch (dlErr) {
+        console.warn(`[Cloud Sync] Error downloading screenshot (${key}):`, dlErr);
+      }
+    }
+
+    if (downloadedImgs.length > 0) {
+      await saveScreenshotsToStorage(sessionDate, downloadedImgs, safeAccountId);
+      console.log(`[Cloud Sync] Downloaded ${downloadedImgs.length} screenshot(s) from R2 for ${sessionDate}`);
+    }
+    return downloadedImgs;
+  } catch (err) {
+    console.warn('Lazy fetch screenshots warning:', err);
+    return [];
+  }
 }
 
 // Mutex lock and throttling for sync execution

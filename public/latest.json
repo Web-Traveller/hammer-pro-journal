@@ -1,14 +1,18 @@
 {
   "version": "2.3.3",
-  "notes": "Hammer Pro Journal v2.3.3: Multi-Account Cloudflare R2 Sync, Dynamic Extended Hours, Mobile Logout Confirmation & $0.04 Default Fees",
-  "pub_date": "2026-09-10T00:00:00Z",
+  "notes": "Hammer Pro Journal v2.3.3 - Full Cloudflare R2 Sync, Mobile Terminal, and Tape Analytics",
+  "pub_date": "2026-09-10T22:27:55.631Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVScGh6OStMM2FBUWRCU1BUbXV2N3lOeUhNMWxYVEFCWW9GZWNlN1Z0S2UrZHZVUUxlRFF6cXExejByTld3Z05nUkhLM0xpd3pjbjBwUUJ1UGorNFV1dFRrQmFjWnR4blFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4OTk4MjE3CWZpbGU6SGFtbWVyIFBybyBKb3VybmFsXzIuMy4zX3g2NC1zZXR1cC5leGUKSnBINi9MSTd6ejAyb1pyZnY5eXZxVHlWYXBmbW5ZbFgrczNZRkxIMUxWU1VKNy9jcGszUzRSdjRpR2NLMUFZYktYZnlmd2oxV0dqN1pWYUVNVjNDQkE9PQo=",
-      "url": "https://github.com/Web-Traveller/hammer-pro-journal/releases/download/v2.3.3/Hammer.Pro.Journal_2.3.3_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVScGh6OStMM2FBUWFnL3lkcnNMdUw2RmNvWURVOU9CaWR0byszaWR3M2FJTGQzS0g5MU1RZDBXVnFUcXNKT3pWWnVHT3Q4Y0lmWlZ4d1VXQnAybHZBYjFYUTdJZDFsOEFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MDc5MjcxCWZpbGU6SGFtbWVyIFBybyBKb3VybmFsXzIuMy4zX3g2NF9lbi1VUy5tc2kKanFYTzYrYkRFcnFaS3JSd0M3VlQzVEJvb2Y0Y0F3Rk5IVkZrNGFTQXBMMHdFV1M5QzZEZFgyamNsVWk4MHZtQ0Y3M3lJMnNnS2FwOFJCYTBMbEZZQVE9PQo=",
+      "url": "https://github.com/Web-Traveller/hammer-pro-journal/releases/download/v2.3.3/Hammer.Pro.Journal_2.3.3_x64_en-US.msi"
+    },
+    "windows-x86_64-msi": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVScGh6OStMM2FBUWFnL3lkcnNMdUw2RmNvWURVOU9CaWR0byszaWR3M2FJTGQzS0g5MU1RZDBXVnFUcXNKT3pWWnVHT3Q4Y0lmWlZ4d1VXQnAybHZBYjFYUTdJZDFsOEFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MDc5MjcxCWZpbGU6SGFtbWVyIFBybyBKb3VybmFsXzIuMy4zX3g2NF9lbi1VUy5tc2kKanFYTzYrYkRFcnFaS3JSd0M3VlQzVEJvb2Y0Y0F3Rk5IVkZrNGFTQXBMMHdFV1M5QzZEZFgyamNsVWk4MHZtQ0Y3M3lJMnNnS2FwOFJCYTBMbEZZQVE9PQo=",
+      "url": "https://github.com/Web-Traveller/hammer-pro-journal/releases/download/v2.3.3/Hammer.Pro.Journal_2.3.3_x64_en-US.msi"
     },
     "windows-x86_64-nsis": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVScGh6OStMM2FBUWRCU1BUbXV2N3lOeUhNMWxYVEFCWW9GZWNlN1Z0S2UrZHZVUUxlRFF6cXExejByTld3Z05nUkhLM0xpd3pjbjBwUUJ1UGorNFV1dFRrQmFjWnR4blFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4OTk4MjE3CWZpbGU6SGFtbWVyIFBybyBKb3VybmFsXzIuMy4zX3g2NC1zZXR1cC5leGUKSnBINi9MSTd6ejAyb1pyZnY5eXZxVHlWYXBmbW5ZbFgrczNZRkxIMUxWU1VKNy9jcGszUzRSdjRpR2NLMUFZYktYZnlmd2oxV0dqN1pWYUVNVjNDQkE9PQo=",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVScGh6OStMM2FBUWY1RXhiaGx5UGtIUVhlZy9RblhqWGdzSG4rY25mMG9STDU1ei9VSURTZHA4VEFzTGJxSXZDRU1rT2g0c0Uwem56SDc0Mi9HUnJlVWpzalUzcG9aVWcwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MDc5MjcxCWZpbGU6SGFtbWVyIFBybyBKb3VybmFsXzIuMy4zX3g2NC1zZXR1cC5leGUKNGttaVkrczB6bC9zR0FQUG0yRHduVzFzbFViejBpOU1WL21IU1daZEo0T1plNnlNTVFSNXRQVVhWMXZnUlpxa21STWxkOFYrcW1OcExYOWNqSlRIQUE9PQo=",
       "url": "https://github.com/Web-Traveller/hammer-pro-journal/releases/download/v2.3.3/Hammer.Pro.Journal_2.3.3_x64-setup.exe"
     },
     "android": {

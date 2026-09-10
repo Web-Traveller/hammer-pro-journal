@@ -20,6 +20,7 @@ import {
   executeTwoTierSync,
   refreshUserProfile,
   fetchOnDemandSessionLog,
+  fetchOnDemandSessionScreenshots,
   deleteSessionFromCloud
 } from '../services/authService';
 import { checkAppVersionStatus, checkAndApplySilentUpdate } from '../services/versionService';
@@ -435,7 +436,10 @@ export function useTradingState() {
         const note = await loadJournalFromStorage(sessionDate, activeAccountId);
         setJournalNotes(note || '');
 
-        const imgs = await loadScreenshotsFromStorage(sessionDate, activeAccountId);
+        let imgs = await loadScreenshotsFromStorage(sessionDate, activeAccountId);
+        if (!imgs || imgs.length === 0) {
+          imgs = await fetchOnDemandSessionScreenshots(sessionDate, activeAccountId);
+        }
         screenshotHandlers.setSessionScreenshots(imgs || []);
 
         if (logs[sessionDate]) {
