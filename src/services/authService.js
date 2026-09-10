@@ -538,6 +538,7 @@ export async function fetchOnDemandSessionScreenshots(sessionDate, accountId = '
 // Mutex lock and throttling for sync execution
 let isSyncRunning = false;
 let activeSyncPromise = null;
+let activeSyncAccountId = null;   // ← track which account owns the current in-flight sync
 let lastSyncExecutionTime = 0;
 
 let hasAccountIdChecked = false;
@@ -575,9 +576,10 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}, accou
     return { success: false, mode: 'local', error: 'Cloud Sync is disabled for your account. Contact the administrator to enable cloud sync.' };
   }
 
-  // Mutex Lock: Await in-flight sync
-  if (isSyncRunning && activeSyncPromise) {
-    console.log(`[Sync] Synchronization already in progress for ${safeAccountId}. Awaiting in-flight sync...`);
+  // Mutex Lock: Only share the in-flight promise when it's for the SAME account.
+  // If the in-flight sync belongs to a different account, let this call proceed independently.
+  if (isSyncRunning && activeSyncPromise && activeSyncAccountId === safeAccountId) {
+    console.log(`[Sync] Sync already in progress for ${safeAccountId}. Awaiting in-flight sync...`);
     try {
       return await activeSyncPromise;
     } catch (e) {
@@ -592,6 +594,7 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}, accou
   }
 
   isSyncRunning = true;
+  activeSyncAccountId = safeAccountId;   // ← tag the mutex with the owning account
   lastSyncExecutionTime = now;
 
   const runSync = async () => {
@@ -869,6 +872,7 @@ export async function executeTwoTierSync(dailyStatsMap = {}, options = {}, accou
   } finally {
     isSyncRunning = false;
     activeSyncPromise = null;
+    activeSyncAccountId = null;
   }
 }
 

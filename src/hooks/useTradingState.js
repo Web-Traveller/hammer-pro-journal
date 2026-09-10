@@ -210,10 +210,14 @@ export function useTradingState() {
   useEffect(() => {
     let isCurrent = true;
 
-    // Step 4: Instantly clear local state to prevent PnL jumping
+    // Synchronously wipe ALL account-specific state before any async work begins
+    // This prevents stale data from a previous account from being visible even momentarily
     setLogs({});
     setSessionDate('');
+    setJournalNotes('');
+    setEditingSessionLog('');
     userLockedSessionDateRef.current = false;
+    screenshotHandlers.setSessionScreenshots([]);
 
     async function initData() {
       try {
@@ -274,6 +278,14 @@ export function useTradingState() {
   // Listen to sync broadcasts without overriding user-picked dates and isolated by account
   useEffect(() => {
     const unsubscribe = subscribeSyncStatus((statusPayload) => {
+      // ── ACCOUNT GUARD: discard ALL data that belongs to a different account ──
+      // This must be the very first check. Even profile updates from another
+      // account's sync cycle must not trigger a state update for this account.
+      const payloadAccountId = statusPayload.accountId;
+      if (payloadAccountId && payloadAccountId !== activeAccountId) {
+        return;
+      }
+
       setSyncState(statusPayload);
       if (statusPayload.profile !== undefined) {
         setUserProfile(prev => {
@@ -301,13 +313,10 @@ export function useTradingState() {
         });
       }
 
-      // Step 4: Ignore broadcast if it belongs to a different account
-      if (statusPayload.accountId && statusPayload.accountId !== activeAccountId) {
-        return;
-      }
-
       if (statusPayload.syncedLogs && Object.keys(statusPayload.syncedLogs).length > 0) {
-        setLogs(prev => ({ ...prev, ...statusPayload.syncedLogs }));
+        // Use full replacement, NOT a merge spread. A merge would let Account 1 data
+        // bleed into Account 2 if a cross-account broadcast slips through.
+        setLogs(statusPayload.syncedLogs);
         const sorted = Object.keys(statusPayload.syncedLogs).sort().reverse();
 
         // ONLY change date if user has not manually locked their selected date
