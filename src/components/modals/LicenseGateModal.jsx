@@ -52,6 +52,8 @@ export function LicenseGateModal({ isOpen = false, licenseCheck, userProfile, on
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
         zIndex: 99998,
+        pointerEvents: 'auto',
+        userSelect: 'auto',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

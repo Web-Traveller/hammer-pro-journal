@@ -36,6 +36,8 @@ export function ForceUpdateModal({ versionStatus }) {
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
         zIndex: 99999,
+        pointerEvents: 'auto',
+        userSelect: 'auto',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
