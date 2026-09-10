@@ -941,6 +941,50 @@
       line-height: 1.8;
     }
 
+    .install-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .install-tab {
+      padding: 9px 18px;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid var(--border-strong);
+      border-radius: 6px;
+      background: white;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all .15s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .install-tab:hover {
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    .install-tab.active {
+      background: var(--green);
+      color: white;
+      border-color: var(--green);
+    }
+
+    .nav-apk {
+      background: #f0fdf4 !important;
+      border-color: #86efac !important;
+      color: #166534 !important;
+    }
+
+    .nav-apk:hover {
+      background: #dcfce7 !important;
+      border-color: #4ade80 !important;
+      color: #14532d !important;
+    }
+
     .steps {
       display: grid;
       gap: 8px;
@@ -1210,7 +1254,11 @@
 
         <a id="nav-win-btn" class="nav-download"
           href="https://github.com/Web-Traveller/hammer-pro-journal/releases/latest">
-          Download <span class="js-ver-pill">v2.3.3</span>
+          Windows <span class="js-ver-pill">v2.3.3</span>
+        </a>
+        <a id="nav-apk-btn" class="nav-download nav-apk"
+          href="https://github.com/Web-Traveller/hammer-pro-journal/releases/download/v2.3.3/HammerPro-Journal-v2.3.3-Android.apk">
+          Android APK
         </a>
       </nav>
 
@@ -1261,21 +1309,16 @@
 
           <a id="btn-apk" class="button button-secondary"
             href="https://github.com/Web-Traveller/hammer-pro-journal/releases/download/v2.3.3/HammerPro-Journal-v2.3.3-Android.apk">
-            Android APK (.apk)
+            <span id="apk-btn-text">Download Android APK (.apk)</span>
+            ↓
           </a>
-
-          <!-- <a id="btn-zip" class="button button-ghost"
-            href="https://github.com/Web-Traveller/hammer-pro-journal/releases/latest"
-            title="Portable .zip download for instant execution without Windows installer">
-            Portable .ZIP (SmartScreen Bypass) ↓
-          </a> -->
 
         </div>
 
         <div class="hero-trust">
-          <span>Local-first SQLite</span>
+          <span>Local SQLite + Cloud R2</span>
+          <span>Windows &amp; Android Apps</span>
           <span>No broker login required</span>
-          <span>Raw trade imports</span>
           <span>Zero cloud latency</span>
         </div>
 
@@ -1298,18 +1341,18 @@
         </div>
 
         <div class="trust-item">
-          <span class="trust-label">Data source</span>
-          <span class="trust-value">Your trade exports</span>
+          <span class="trust-label">Platforms</span>
+          <span class="trust-value">Windows &amp; Android</span>
         </div>
 
         <div class="trust-item">
           <span class="trust-label">Storage</span>
-          <span class="trust-value">Your machine</span>
+          <span class="trust-value">Local + Cloud R2</span>
         </div>
 
         <div class="trust-item">
           <span class="trust-label">Accounts</span>
-          <span class="trust-value">Multiple workspaces</span>
+          <span class="trust-value">Multi-Account Sync</span>
         </div>
 
       </div>
@@ -1769,102 +1812,113 @@
         <div class="install-copy">
 
           <div class="kicker">
-            Windows installation
+            Cross-Platform Setup
           </div>
 
           <h2>
-            One download.
+            Desktop &amp; Mobile.<br>
             A few clicks.
           </h2>
 
           <p>
-            Because Hammer Pro is independently distributed, Windows
-            SmartScreen may display a warning when you first download
-            the installer.
+            Hammer Pro is distributed directly as a native Windows desktop app (<kbd>.exe</kbd>) and a standalone Android application (<kbd>.apk</kbd>) for traders reviewing execution data anywhere.
           </p>
 
           <p>
-            The warning is related to application reputation and
-            signing, not a Hammer Pro login requirement.
+            Because Hammer Pro is independently signed, simple one-time approval steps ensure seamless local execution.
           </p>
+
+          <div style="margin-top: 25px; display: flex; gap: 10px; flex-wrap: wrap;">
+            <a id="install-win-link" class="button button-primary" style="font-size:12px; padding:8px 16px;" href="https://github.com/Web-Traveller/hammer-pro-journal/releases/latest">
+              Windows Setup (.exe)
+            </a>
+            <a id="install-apk-link" class="button button-secondary" style="font-size:12px; padding:8px 16px;" href="https://github.com/Web-Traveller/hammer-pro-journal/releases/download/v2.3.3/HammerPro-Journal-v2.3.3-Android.apk">
+              Android APK (.apk)
+            </a>
+          </div>
 
         </div>
 
 
-        <div class="steps">
+        <div class="steps-container">
+          <div class="install-tabs">
+            <button type="button" class="install-tab active" id="tab-btn-win" onclick="window.switchInstallTab('win')">🖥️ Windows Desktop</button>
+            <button type="button" class="install-tab" id="tab-btn-android" onclick="window.switchInstallTab('android')">📱 Android Mobile</button>
+          </div>
 
-          <div class="step">
+          <!-- WINDOWS STEPS -->
+          <div class="steps" id="steps-win">
 
-            <div class="step-number">
-              01
+            <div class="step">
+              <div class="step-number">01</div>
+              <div>
+                <h3>Download Windows Installer</h3>
+                <p>Download the latest <kbd>Hammer.Pro.Journal_x64-setup.exe</kbd> package.</p>
+              </div>
             </div>
 
-            <div>
-              <h3>Keep the download</h3>
+            <div class="step">
+              <div class="step-number">02</div>
+              <div>
+                <h3>Choose Keep if Prompted</h3>
+                <p>If Edge or Chrome displays a download check, choose <kbd>Keep</kbd> → <kbd>Keep anyway</kbd>.</p>
+              </div>
+            </div>
 
-              <p>
-                In Microsoft Edge, open the download menu and choose
-                <kbd>Keep</kbd>.
-              </p>
+            <div class="step">
+              <div class="step-number">03</div>
+              <div>
+                <h3>Run &amp; Approve SmartScreen</h3>
+                <p>Open the file. If Windows SmartScreen appears, select <kbd>More info</kbd> and then <kbd>Run anyway</kbd>.</p>
+              </div>
+            </div>
+
+            <div class="step">
+              <div class="step-number">04</div>
+              <div>
+                <h3>Import Executions &amp; Sync</h3>
+                <p>Launch Hammer Pro and import broker logs or enable Cloudflare R2 multi-account sync.</p>
+              </div>
             </div>
 
           </div>
 
+          <!-- ANDROID STEPS -->
+          <div class="steps" id="steps-android" style="display: none;">
 
-          <div class="step">
-
-            <div class="step-number">
-              02
+            <div class="step">
+              <div class="step-number">01</div>
+              <div>
+                <h3>Download Android APK</h3>
+                <p>Download the <kbd>HammerPro-Journal-Android.apk</kbd> package directly to your phone or tablet.</p>
+              </div>
             </div>
 
-            <div>
-              <h3>Choose Keep anyway</h3>
-
-              <p>
-                If Edge displays a download warning, select
-                <kbd>Keep anyway</kbd>.
-              </p>
+            <div class="step">
+              <div class="step-number">02</div>
+              <div>
+                <h3>Open Downloaded Package</h3>
+                <p>Tap the completed download notification or open it from your device's <strong>Files / Downloads</strong> app.</p>
+              </div>
             </div>
 
-          </div>
-
-
-          <div class="step">
-
-            <div class="step-number">
-              03
+            <div class="step">
+              <div class="step-number">03</div>
+              <div>
+                <h3>Allow Unknown Apps (One-time)</h3>
+                <p>If prompted by Android security, tap <kbd>Settings</kbd> and toggle <kbd>Allow from this source</kbd>.</p>
+              </div>
             </div>
 
-            <div>
-              <h3>Run the installer</h3>
-
-              <p>
-                Open the downloaded file. If SmartScreen appears,
-                select <kbd>More info</kbd> and then
-                <kbd>Run anyway</kbd>.
-              </p>
-            </div>
-
-          </div>
-
-
-          <div class="step">
-
-            <div class="step-number">
-              04
-            </div>
-
-            <div>
-              <h3>Import your executions</h3>
-
-              <p>
-                Open Hammer Pro and bring in your broker's exported
-                trade history.
-              </p>
+            <div class="step">
+              <div class="step-number">04</div>
+              <div>
+                <h3>Install &amp; Start Journaling</h3>
+                <p>Tap <kbd>Install</kbd> to launch Hammer Pro Mobile with live session stats and R2 cloud sync.</p>
+              </div>
             </div>
 
           </div>
-
         </div>
 
       </div>
@@ -1891,7 +1945,7 @@
 
         <p>
           Measure your speed. Understand your execution.
-          Know your real net result.
+          Know your real net result on desktop and mobile.
         </p>
 
 
@@ -1899,7 +1953,12 @@
 
           <a id="cta-win-btn" class="button button-primary"
             href="https://github.com/Web-Traveller/hammer-pro-journal/releases/latest">
-            Download Hammer Pro <span class="js-ver-pill">v2.3.3</span> →
+            Download for Windows <span class="js-ver-pill">v2.3.3</span> →
+          </a>
+
+          <a id="cta-apk-btn" class="button button-secondary"
+            href="https://github.com/Web-Traveller/hammer-pro-journal/releases/download/v2.3.3/HammerPro-Journal-v2.3.3-Android.apk">
+            Download for Android <span class="js-ver-pill">v2.3.3</span> (.apk) ↓
           </a>
 
         </div>
@@ -1932,12 +1991,38 @@
   </footer>
 
   <script>
+    // Tab switching for installation section
+    window.switchInstallTab = function(platform) {
+      const winTab = document.getElementById('tab-btn-win');
+      const androidTab = document.getElementById('tab-btn-android');
+      const winSteps = document.getElementById('steps-win');
+      const androidSteps = document.getElementById('steps-android');
+
+      if (platform === 'android') {
+        if (winTab) winTab.classList.remove('active');
+        if (androidTab) androidTab.classList.add('active');
+        if (winSteps) winSteps.style.display = 'none';
+        if (androidSteps) androidSteps.style.display = 'grid';
+      } else {
+        if (winTab) winTab.classList.add('active');
+        if (androidTab) androidTab.classList.remove('active');
+        if (winSteps) winSteps.style.display = 'grid';
+        if (androidSteps) androidSteps.style.display = 'none';
+      }
+    };
+
     (function () {
       const SOURCES = [
         'https://api.github.com/repos/Web-Traveller/hammer-pro-journal/releases/latest',
         './latest.json',
         'https://raw.githubusercontent.com/Web-Traveller/hammer-pro-journal/main/public/latest.json'
       ];
+
+      // Auto detect mobile Android visitors
+      const isAndroid = /android/i.test(navigator.userAgent);
+      if (isAndroid) {
+        window.switchInstallTab('android');
+      }
 
       async function syncLatestBuild() {
         let data = null;
@@ -2001,7 +2086,7 @@
             if (zipAsset) zipUrl = zipAsset.browser_download_url;
           }
 
-          // Guaranteed deterministic fallback links based on release tag
+          // Guaranteed deterministic fallback links based on release tag & naming convention
           if (!winUrl) {
             winUrl = `https://github.com/Web-Traveller/hammer-pro-journal/releases/download/${tag}/Hammer.Pro.Journal_${version}_x64-setup.exe`;
           }
@@ -2015,8 +2100,13 @@
           // 3. Wire up all interactive buttons
           const navBtn = document.getElementById('nav-win-btn');
           if (navBtn) {
-            navBtn.innerHTML = `Download <span class="js-ver-pill">${tag}</span>`;
+            navBtn.innerHTML = `Windows <span class="js-ver-pill">${tag}</span>`;
             navBtn.href = winUrl;
+          }
+
+          const navApkBtn = document.getElementById('nav-apk-btn');
+          if (navApkBtn) {
+            navApkBtn.href = apkUrl;
           }
 
           const winBtn = document.getElementById('btn-win');
@@ -2028,15 +2118,37 @@
           }
 
           const apkBtn = document.getElementById('btn-apk');
-          if (apkBtn) apkBtn.href = apkUrl;
+          if (apkBtn) {
+            apkBtn.href = apkUrl;
+            const apkText = document.getElementById('apk-btn-text');
+            if (apkText) apkText.textContent = `Download Android APK (.apk)`;
+          }
+
+          const installWinLink = document.getElementById('install-win-link');
+          if (installWinLink) installWinLink.href = winUrl;
+
+          const installApkLink = document.getElementById('install-apk-link');
+          if (installApkLink) installApkLink.href = apkUrl;
 
           const zipBtn = document.getElementById('btn-zip');
           if (zipBtn) zipBtn.href = zipUrl;
 
           const ctaBtn = document.getElementById('cta-win-btn');
           if (ctaBtn) {
-            ctaBtn.innerHTML = `Download Hammer Pro ${tag} →`;
+            ctaBtn.innerHTML = `Download for Windows ${tag} →`;
             ctaBtn.href = winUrl;
+          }
+
+          const ctaApkBtn = document.getElementById('cta-apk-btn');
+          if (ctaApkBtn) {
+            ctaApkBtn.innerHTML = `Download for Android ${tag} (.apk) ↓`;
+            ctaApkBtn.href = apkUrl;
+          }
+
+          // If on Android, promote Android button to primary
+          if (isAndroid && apkBtn && winBtn) {
+            apkBtn.className = "button button-primary";
+            winBtn.className = "button button-secondary";
           }
         } catch (err) {
           console.error('Failed to sync latest build details:', err);
